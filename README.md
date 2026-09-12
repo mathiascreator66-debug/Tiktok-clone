@@ -1,6 +1,6 @@
 # ClipTok — Clone TikTok local
 
-Application web type TikTok : fil vertical plein écran, comptes, upload vidéo, likes, commentaires, republications, profils éditables et connexion Google.
+Application web type TikTok : fil vertical plein écran, comptes, upload vidéo, likes, commentaires, republications, **follows**, **messages privés**, profils et paramètres.
 
 ## Stack
 
@@ -8,6 +8,7 @@ Application web type TikTok : fil vertical plein écran, comptes, upload vidéo,
 - **SQLite** via **Prisma 5**
 - Auth : cookies de session **JWT** (`jose`) + hachage **bcrypt** + OAuth Google (manuel, même cookie)
 - Stockage des vidéos sur le disque local (`public/uploads/`)
+- Messages : polling (pas de WebSocket)
 
 ## Prérequis
 
@@ -26,7 +27,7 @@ npx prisma db push
 npm run db:seed
 ```
 
-Le seed télécharge 5 vidéos d’exemple dans `public/uploads/` et crée 3 comptes démo.
+Le seed télécharge 5 vidéos d’exemple dans `public/uploads/`, crée 4 comptes démo, des **follows** et des **conversations DM** d’exemple.
 
 ## Lancer l’app
 
@@ -43,6 +44,16 @@ Ouvrez [http://localhost:3000](http://localhost:3000).
 | demo@cliptok.local | demo1234 | demo |
 | alice@cliptok.local | demo1234 | alice |
 | bob@cliptok.local | demo1234 | bob |
+| charlie@cliptok.local | demo1234 | charlie |
+
+### Tester les messages (2 comptes)
+
+1. Connexion `demo@cliptok.local` / `demo1234` → onglet **Messages** : conversations avec Alice, Bob + demande de Charlie.
+2. Ouvrir un fil, répondre.
+3. Déconnexion → connexion `alice@cliptok.local` / `demo1234` → Messages → conversation avec Démo (polling ~4 s).
+4. Depuis un profil (ex. `/profil/bob`), bouton **Message** ouvre/crée le fil.
+
+Onglets inbox : **Principal** (personnes que vous suivez), **Demandes** (ex. Charlie → demo), **Non lu**.
 
 ## Variables d’environnement
 
@@ -70,47 +81,57 @@ Voir `.env.example` :
    ```
 8. Redémarrez `npm run dev` — le bouton « Continuer avec Google » s’active
 
-La connexion Google crée ou lie un utilisateur par e-mail et pose le **même cookie JWT** que l’auth e-mail/mot de passe.
-
 ## Fonctionnalités
 
-1. **Auth** — inscription, connexion, déconnexion, Google OAuth
+1. **Auth** — inscription, connexion, déconnexion, Google OAuth, changement de mot de passe
 2. **Fil « Pour toi »** — scroll vertical snap, autoplay muet jusqu’à interaction
-3. **Upload** — vidéo courte + légende (utilisateurs connectés)
-4. **Likes** — bascule + compteur
-5. **Commentaires** — panneau / sheet avec liste, timestamps, liens profil, Envoyer
-6. **Republication** — « Republier » (modèle Repost) mélangée au fil avec libellé « Republie @user »
-7. **Partage** — Web Share API ou copie du lien (« Lien copié »)
-8. **Profils** — bio, nom d’affichage, avatar URL, bouton « Modifier »
-9. **Édition / suppression** — menu ⋯ sur ses vidéos (légende + supprimer fichier local)
-10. **UI** — thème sombre, libellés en français, mobile-first
+3. **Upload** — vidéo courte + légende
+4. **Likes / commentaires / republications / partage**
+5. **Follows** — Suivre / Ne plus suivre ; stats Suivis / Followers / J’aime sur le profil
+6. **Amis** — liste des suivis + suggestions
+7. **Messages privés** — inbox (Principal / Demandes / Non lu), fil de discussion, badge non lus, polling
+8. **Profil** — grille vidéos, crayon d’édition, bouton Message, menu hamburger → paramètres
+9. **Paramètres** — compte (infos, mot de passe, déconnexion) ; autres entrées stub « bientôt »
+10. **Nav mobile** — Accueil | Amis | + | Messages | Profil
 
 ## Routes principales
 
 | Route | Description |
 |-------|-------------|
-| `/` | Fil vertical Pour toi (originaux + republications) |
-| `/connexion` | Connexion (+ Google) |
-| `/inscription` | Inscription (+ Google) |
-| `/telecharger` | Publier une vidéo |
-| `/profil/[username]` | Profil utilisateur |
-| `/profil/[username]/modifier` | Éditer son profil |
-| `/api/auth/*` | Auth e-mail + Google |
-| `/api/users/me` | PATCH profil (auth) |
-| `/api/videos` | Liste / upload |
-| `/api/videos/[id]` | PATCH légende / DELETE vidéo |
-| `/api/videos/[id]/like` | Like |
-| `/api/videos/[id]/comments` | Commentaires |
-| `/api/videos/[id]/repost` | POST/DELETE republication |
+| `/` | Fil Pour toi |
+| `/amis` | Suivis + suggestions |
+| `/messages` | Inbox DM |
+| `/messages/[username]` | Fil de discussion |
+| `/telecharger` | Publier |
+| `/profil/[username]` | Profil |
+| `/profil/[username]/modifier` | Éditer le profil |
+| `/parametres` | Paramètres et confidentialité |
+| `/parametres/compte` | Infos compte / mot de passe / logout |
+| `/api/follow/[username]` | POST/DELETE follow |
+| `/api/messages` | Liste conversations |
+| `/api/messages/[username]` | GET/POST fil |
+| `/api/messages/unread` | Compteur non lus |
+| `/api/auth/password` | Changer le mot de passe |
+
+## Schéma (extra)
+
+- `Follow` — followerId / followingId (unique)
+- `Conversation` — participantAId / participantBId (IDs ordonnés, unique)
+- `Message` — conversationId, senderId, body, createdAt, readAt?
+
+## Hors périmètre / stubbés
+
+- Solde, LIVE, Shop, Famille, passkeys, succession, analytics, promouvoir, Studio, QR, hors ligne, Stories (badge « bientôt »)
+- Pas de WebSocket (polling), pas de paiements
 
 ## Limites connues
 
 - Pas de live, Duets, algo ML, notifications push
 - Vidéos démo en paysage — le lecteur utilise `object-cover`
 - Upload limité à 50 Mo, stockage local uniquement
-- Pas de pagination du fil (tout charge d’un coup)
-- Avatar = URL externe uniquement (pas d’upload d’image v1)
-- Google OAuth nécessite une config Cloud Console ; sans env vars le bouton est désactivé
+- Pas de pagination du fil
+- Avatar = URL externe uniquement
+- Google OAuth optionnel
 
 ## Scripts utiles
 

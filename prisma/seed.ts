@@ -52,6 +52,10 @@ async function downloadIfNeeded(url: string, dest: string) {
   console.log(`  OK (${(buf.length / 1024 / 1024).toFixed(1)} Mo)`);
 }
 
+function orderedPair(a: string, b: string): [string, string] {
+  return a < b ? [a, b] : [b, a];
+}
+
 async function main() {
   const uploadsDir = path.join(process.cwd(), "public", "uploads");
   await mkdir(uploadsDir, { recursive: true });
@@ -108,13 +112,42 @@ async function main() {
     },
   });
 
+  const charlie = await prisma.user.upsert({
+    where: { email: "charlie@cliptok.local" },
+    update: {
+      bio: "Nouveau sur ClipTok — suggestions & demandes",
+      displayName: "Charlie",
+    },
+    create: {
+      email: "charlie@cliptok.local",
+      username: "charlie",
+      passwordHash,
+      bio: "Nouveau sur ClipTok — suggestions & demandes",
+      displayName: "Charlie",
+    },
+  });
+
+  await prisma.message.deleteMany({});
+  await prisma.conversation.deleteMany({});
+  await prisma.follow.deleteMany({});
   await prisma.comment.deleteMany({});
   await prisma.like.deleteMany({});
   await prisma.repost.deleteMany({});
   await prisma.video.deleteMany({});
 
-  const authors = [demo, alice, bob, demo, alice];
+  // Follows: demo ↔ alice (mutual), demo → bob, alice → bob, charlie → demo (demande)
+  const follows: [string, string][] = [
+    [demo.id, alice.id],
+    [alice.id, demo.id],
+    [demo.id, bob.id],
+    [alice.id, bob.id],
+    [charlie.id, demo.id],
+  ];
+  for (const [followerId, followingId] of follows) {
+    await prisma.follow.create({ data: { followerId, followingId } });
+  }
 
+  const authors = [demo, alice, bob, demo, alice];
   for (let i = 0; i < SAMPLES.length; i++) {
     const s = SAMPLES[i];
     await prisma.video.create({
@@ -158,12 +191,65 @@ async function main() {
     });
   }
 
+  // DM threads
+  async function seedThread(
+    u1: { id: string },
+    u2: { id: string },
+    msgs: { senderId: string; body: string; minutesAgo: number; read?: boolean }[]
+  ) {
+    const [a, b] = orderedPair(u1.id, u2.id);
+    const conv = await prisma.conversation.create({
+      data: { participantAId: a, participantBId: b },
+    });
+    for (const m of msgs) {
+      const createdAt = new Date(Date.now() - m.minutesAgo * 60_000);
+      await prisma.message.create({
+        data: {
+          conversationId: conv.id,
+          senderId: m.senderId,
+          body: m.body,
+          createdAt,
+          readAt: m.read === false ? null : new Date(createdAt.getTime() + 30_000),
+        },
+      });
+    }
+    const last = msgs.reduce((acc, m) => Math.min(acc, m.minutesAgo), Infinity);
+    await prisma.conversation.update({
+      where: { id: conv.id },
+      data: { updatedAt: new Date(Date.now() - last * 60_000) },
+    });
+  }
+
+  await seedThread(demo, alice, [
+    { senderId: alice.id, body: "Salut Démo ! Bienvenue sur ClipTok 👋", minutesAgo: 120 },
+    { senderId: demo.id, body: "Merci Alice ! Les vidéos sont top.", minutesAgo: 90 },
+    { senderId: alice.id, body: "N'hésite pas à me follow back ✨", minutesAgo: 45 },
+    { senderId: demo.id, body: "Déjà fait 😄", minutesAgo: 30, read: false },
+  ]);
+
+  await seedThread(demo, bob, [
+    { senderId: bob.id, body: "Tu as vu le extrait Sintel ?", minutesAgo: 200 },
+    { senderId: demo.id, body: "Oui, trop beau 🗡️", minutesAgo: 180 },
+    { senderId: bob.id, body: "Je republie ça ce soir.", minutesAgo: 10, read: false },
+  ]);
+
+  // Demande: charlie message demo (demo does not follow charlie)
+  await seedThread(demo, charlie, [
+    {
+      senderId: charlie.id,
+      body: "Hey ! Je viens de m'inscrire, on peut échanger ?",
+      minutesAgo: 5,
+      read: false,
+    },
+  ]);
+
   console.log("\nSeed terminé !");
   console.log("Comptes démo (mot de passe: demo1234):");
   console.log("  - demo@cliptok.local / demo");
   console.log("  - alice@cliptok.local / alice");
   console.log("  - bob@cliptok.local / bob");
-  console.log(`${SAMPLES.length} vidéos créées.`);
+  console.log("  - charlie@cliptok.local / charlie");
+  console.log(`${SAMPLES.length} vidéos, follows + DMs créés.`);
 }
 
 main()
