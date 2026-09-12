@@ -13,32 +13,40 @@ export async function GET(
       select: {
         id: true,
         username: true,
+        displayName: true,
         avatarUrl: true,
+        bio: true,
         createdAt: true,
         videos: {
           orderBy: { createdAt: "desc" },
           include: {
-            _count: { select: { likes: true, comments: true } },
+            _count: { select: { likes: true, comments: true, reposts: true } },
             likes: session
               ? { where: { userId: session.id }, select: { id: true } }
               : false,
           },
         },
-        _count: { select: { videos: true } },
+        _count: { select: { videos: true, reposts: true } },
       },
     });
 
     if (!user) {
-      return NextResponse.json({ error: "Utilisateur introuvable." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Utilisateur introuvable." },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({
       user: {
         id: user.id,
         username: user.username,
+        displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        bio: user.bio,
         createdAt: user.createdAt.toISOString(),
         videoCount: user._count.videos,
+        repostCount: user._count.reposts,
         videos: user.videos.map((v) => ({
           id: v.id,
           caption: v.caption,
@@ -46,6 +54,7 @@ export async function GET(
           createdAt: v.createdAt.toISOString(),
           likeCount: v._count.likes,
           commentCount: v._count.comments,
+          repostCount: v._count.reposts,
           likedByMe: Array.isArray(v.likes) ? v.likes.length > 0 : false,
         })),
       },

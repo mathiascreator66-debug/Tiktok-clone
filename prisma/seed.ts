@@ -65,36 +65,52 @@ async function main() {
 
   const demo = await prisma.user.upsert({
     where: { email: "demo@cliptok.local" },
-    update: {},
+    update: {
+      bio: "Compte démo ClipTok 🎬",
+      displayName: "Démo",
+    },
     create: {
       email: "demo@cliptok.local",
       username: "demo",
       passwordHash,
+      bio: "Compte démo ClipTok 🎬",
+      displayName: "Démo",
     },
   });
 
   const alice = await prisma.user.upsert({
     where: { email: "alice@cliptok.local" },
-    update: {},
+    update: {
+      bio: "Créatrice de contenus · voyage & lifestyle",
+      displayName: "Alice",
+    },
     create: {
       email: "alice@cliptok.local",
       username: "alice",
       passwordHash,
+      bio: "Créatrice de contenus · voyage & lifestyle",
+      displayName: "Alice",
     },
   });
 
   const bob = await prisma.user.upsert({
     where: { email: "bob@cliptok.local" },
-    update: {},
+    update: {
+      bio: "Fan de cinéma open source 🎞️",
+      displayName: "Bob",
+    },
     create: {
       email: "bob@cliptok.local",
       username: "bob",
       passwordHash,
+      bio: "Fan de cinéma open source 🎞️",
+      displayName: "Bob",
     },
   });
 
   await prisma.comment.deleteMany({});
   await prisma.like.deleteMany({});
+  await prisma.repost.deleteMany({});
   await prisma.video.deleteMany({});
 
   const authors = [demo, alice, bob, demo, alice];
@@ -121,6 +137,9 @@ async function main() {
         userId: bob.id,
         videoId: videos[0].id,
       },
+    });
+    await prisma.repost.create({
+      data: { userId: bob.id, videoId: videos[0].id },
     });
   }
   if (videos[1]) {

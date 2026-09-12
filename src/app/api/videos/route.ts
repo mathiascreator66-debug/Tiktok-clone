@@ -4,32 +4,12 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { getMixedFeed } from "@/lib/feed";
 
 export async function GET() {
   try {
     const session = await getSession();
-    const videos = await prisma.video.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
-        likes: session
-          ? { where: { userId: session.id }, select: { id: true } }
-          : false,
-        _count: { select: { likes: true, comments: true } },
-      },
-    });
-
-    const feed = videos.map((v) => ({
-      id: v.id,
-      caption: v.caption,
-      videoUrl: v.videoUrl,
-      createdAt: v.createdAt.toISOString(),
-      likeCount: v._count.likes,
-      commentCount: v._count.comments,
-      likedByMe: Array.isArray(v.likes) ? v.likes.length > 0 : false,
-      user: v.user,
-    }));
-
+    const feed = await getMixedFeed(session);
     return NextResponse.json({ videos: feed });
   } catch (e) {
     console.error(e);
@@ -60,7 +40,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    // 50 Mo max
     if (file.size > 50 * 1024 * 1024) {
       return NextResponse.json(
         { error: "Vidéo trop lourde (max 50 Mo)." },
@@ -82,7 +61,14 @@ export async function POST(req: NextRequest) {
         userId: session.id,
       },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
       },
     });
 
@@ -94,8 +80,12 @@ export async function POST(req: NextRequest) {
         createdAt: video.createdAt.toISOString(),
         likeCount: 0,
         commentCount: 0,
+        repostCount: 0,
         likedByMe: false,
+        repostedByMe: false,
+        isOwner: true,
         user: video.user,
+        repost: null,
       },
     });
   } catch (e) {

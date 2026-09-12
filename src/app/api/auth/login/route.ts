@@ -16,7 +16,18 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    if (!user || !user.passwordHash) {
+      return NextResponse.json(
+        {
+          error: user?.googleId
+            ? "Ce compte utilise Google. Cliquez sur « Continuer avec Google »."
+            : "Identifiants incorrects.",
+        },
+        { status: 401 }
+      );
+    }
+
+    if (!(await verifyPassword(password, user.passwordHash))) {
       return NextResponse.json(
         { error: "Identifiants incorrects." },
         { status: 401 }
@@ -36,6 +47,8 @@ export async function POST(req: NextRequest) {
         email: user.email,
         username: user.username,
         avatarUrl: user.avatarUrl,
+        displayName: user.displayName,
+        bio: user.bio,
       },
     });
   } catch (e) {

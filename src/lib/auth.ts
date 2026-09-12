@@ -89,8 +89,25 @@ export async function getCurrentUser() {
       id: true,
       email: true,
       username: true,
+      displayName: true,
       avatarUrl: true,
+      bio: true,
       createdAt: true,
     },
   });
+}
+
+export function isGoogleAuthConfigured() {
+  return Boolean(
+    process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET &&
+      process.env.NEXT_PUBLIC_APP_URL
+  );
+}
+
+export function getAppUrl() {
+  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(
+    /\/$/,
+    ""
+  );
 }

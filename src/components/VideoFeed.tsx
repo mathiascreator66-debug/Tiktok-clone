@@ -10,10 +10,14 @@ type Props = {
 };
 
 export default function VideoFeed({ initialVideos, isLoggedIn }: Props) {
-  const [videos] = useState(initialVideos);
+  const [videos, setVideos] = useState(initialVideos);
   const [activeIndex, setActiveIndex] = useState(0);
   const [hasInteracted, setHasInteracted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVideos(initialVideos);
+  }, [initialVideos]);
 
   const onInteract = useCallback(() => setHasInteracted(true), []);
 
@@ -55,17 +59,30 @@ export default function VideoFeed({ initialVideos, isLoggedIn }: Props) {
       className="h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
       style={{ scrollSnapType: "y mandatory" }}
     >
-      {videos.map((video, i) => (
-        <div key={video.id} data-index={i} className="h-[100dvh] snap-start">
-          <VideoCard
-            video={video}
-            isActive={i === activeIndex}
-            isLoggedIn={isLoggedIn}
-            hasInteracted={hasInteracted}
-            onInteract={onInteract}
-          />
-        </div>
-      ))}
+      {videos.map((video, i) => {
+        const key = video.repost
+          ? `r-${video.repost.id}`
+          : `v-${video.id}-${i}`;
+        return (
+          <div key={key} data-index={i} className="h-[100dvh] snap-start">
+            <VideoCard
+              video={video}
+              isActive={i === activeIndex}
+              isLoggedIn={isLoggedIn}
+              hasInteracted={hasInteracted}
+              onInteract={onInteract}
+              onDeleted={() =>
+                setVideos((prev) =>
+                  prev.filter((v, idx) => {
+                    if (idx !== i) return true;
+                    return false;
+                  })
+                )
+              }
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

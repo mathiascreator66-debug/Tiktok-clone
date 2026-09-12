@@ -1,9 +1,15 @@
 import AuthForm from "@/components/AuthForm";
-import { getSession } from "@/lib/auth";
+import { getSession, isGoogleAuthConfigured } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 export default async function InscriptionPage() {
   const session = await getSession();
   if (session) redirect("/");
-  return <AuthForm mode="register" />;
+  const googleEnabled = isGoogleAuthConfigured();
+  return (
+    <Suspense fallback={<div className="min-h-[100dvh] bg-black" />}>
+      <AuthForm mode="register" googleEnabled={googleEnabled} />
+    </Suspense>
+  );
 }
