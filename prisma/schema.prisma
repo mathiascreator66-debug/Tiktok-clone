@@ -26,6 +26,8 @@ model User {
   conversationsA Conversation[] @relation("ConvA")
   conversationsB Conversation[] @relation("ConvB")
   messages     Message[]
+  stories      Story[]
+  storyViews   StoryView[]
 }
 
 model Video {
@@ -111,4 +113,30 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model Story {
+  id        String      @id @default(cuid())
+  userId    String
+  mediaUrl  String
+  caption   String?
+  createdAt DateTime    @default(now())
+  expiresAt DateTime
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  views     StoryView[]
+
+  @@index([expiresAt])
+  @@index([userId, expiresAt])
+}
+
+model StoryView {
+  id        String   @id @default(cuid())
+  userId    String
+  storyId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storyId])
+  @@index([storyId])
 }

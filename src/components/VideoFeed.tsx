@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import VideoCard from "./VideoCard";
+import StoryRail from "./StoryRail";
 import type { FeedVideo } from "@/lib/types";
 
 type Tab = "foryou" | "following";
@@ -10,9 +11,14 @@ type Tab = "foryou" | "following";
 type Props = {
   initialVideos: FeedVideo[];
   isLoggedIn: boolean;
+  currentUsername?: string | null;
 };
 
-export default function VideoFeed({ initialVideos, isLoggedIn }: Props) {
+export default function VideoFeed({
+  initialVideos,
+  isLoggedIn,
+  currentUsername = null,
+}: Props) {
   const [tab, setTab] = useState<Tab>("foryou");
   const [forYouVideos, setForYouVideos] = useState(initialVideos);
   const [followingVideos, setFollowingVideos] = useState<FeedVideo[] | null>(
@@ -39,7 +45,7 @@ export default function VideoFeed({ initialVideos, isLoggedIn }: Props) {
     setFollowingLoading(true);
     setFollowingError(null);
     try {
-      const res = await fetch("/api/videos?feed=following");
+      const res = await fetch("/api/videos?feed=following", { credentials: "include" });
       if (res.status === 401) {
         setFollowingError("login");
         setFollowingVideos([]);
@@ -196,6 +202,7 @@ export default function VideoFeed({ initialVideos, isLoggedIn }: Props) {
     return (
       <div className="relative h-[100dvh] w-full">
         {tabs}
+        <StoryRail isLoggedIn={isLoggedIn} currentUsername={currentUsername} />
         {renderFollowingEmpty()}
       </div>
     );
@@ -205,6 +212,7 @@ export default function VideoFeed({ initialVideos, isLoggedIn }: Props) {
     return (
       <div className="relative h-[100dvh] w-full">
         {tabs}
+        <StoryRail isLoggedIn={isLoggedIn} currentUsername={currentUsername} />
         <div className="h-[100dvh] flex flex-col items-center justify-center text-center px-6">
           <p className="text-xl font-bold mb-2">Aucune vidéo</p>
           <p className="text-white/50 text-sm">
@@ -218,6 +226,7 @@ export default function VideoFeed({ initialVideos, isLoggedIn }: Props) {
   return (
     <div className="relative h-[100dvh] w-full">
       {tabs}
+        <StoryRail isLoggedIn={isLoggedIn} currentUsername={currentUsername} />
       <div
         ref={containerRef}
         className="h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"

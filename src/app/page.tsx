@@ -7,5 +7,11 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const session = await getSession();
   const feed = await getMixedFeed(session);
-  return <VideoFeed initialVideos={feed} isLoggedIn={!!session} />;
+  return (
+    <VideoFeed
+      initialVideos={feed}
+      isLoggedIn={!!session}
+      currentUsername={session?.username ?? null}
+    />
+  );
 }

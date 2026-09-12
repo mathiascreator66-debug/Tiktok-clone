@@ -78,7 +78,7 @@ export default function VideoCard({
     setLiked(!liked);
     setLikeCount(liked ? likeCount - 1 : likeCount + 1);
     try {
-      const res = await fetch(`/api/videos/${video.id}/like`, { method: "POST" });
+      const res = await fetch(`/api/videos/${video.id}/like`, { method: "POST", credentials: "include" });
       const data = await res.json();
       if (!res.ok) {
         setLiked(prevLiked);
@@ -111,6 +111,7 @@ export default function VideoCard({
     try {
       const res = await fetch(`/api/videos/${video.id}/repost`, {
         method: next ? "POST" : "DELETE",
+        credentials: "include",
       });
       const data = await res.json();
       if (!res.ok) {

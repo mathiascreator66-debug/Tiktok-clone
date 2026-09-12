@@ -36,3 +36,23 @@ export type CommentItem = {
     avatarUrl: string | null;
   };
 };
+
+export type StoryItem = {
+  id: string;
+  mediaUrl: string;
+  caption: string | null;
+  createdAt: string;
+  expiresAt: string;
+  viewedByMe: boolean;
+};
+
+export type StoryGroup = {
+  user: {
+    id: string;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+  };
+  stories: StoryItem[];
+  hasUnviewed: boolean;
+};

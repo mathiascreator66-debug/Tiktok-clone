@@ -32,7 +32,7 @@ export default function UploadForm() {
       const form = new FormData();
       form.append("caption", caption);
       form.append("video", file);
-      const res = await fetch("/api/videos", { method: "POST", body: form });
+      const res = await fetch("/api/videos", { method: "POST", body: form, credentials: "include" });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Erreur lors de l'envoi.");

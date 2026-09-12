@@ -58,11 +58,31 @@ function orderedPair(a: string, b: string): [string, string] {
 
 async function main() {
   const uploadsDir = path.join(process.cwd(), "public", "uploads");
+  const storiesDir = path.join(uploadsDir, "stories");
   await mkdir(uploadsDir, { recursive: true });
+  await mkdir(storiesDir, { recursive: true });
 
   console.log("Téléchargement des vidéos démo...");
   for (const s of SAMPLES) {
     await downloadIfNeeded(s.url, path.join(uploadsDir, s.file));
+  }
+
+  console.log("Téléchargement des stories démo...");
+  await downloadIfNeeded(
+    "https://picsum.photos/seed/cliptok1/720/1280.jpg",
+    path.join(storiesDir, "story_demo.jpg")
+  );
+  await downloadIfNeeded(
+    "https://picsum.photos/seed/cliptok2/720/1280.jpg",
+    path.join(storiesDir, "story_alice.jpg")
+  );
+  const storyDemoVideo = path.join(storiesDir, "story_demo_video.mp4");
+  try {
+    await access(storyDemoVideo);
+  } catch {
+    const { copyFile } = await import("fs/promises");
+    await copyFile(path.join(uploadsDir, "demo1.mp4"), storyDemoVideo);
+    console.log("  OK story_demo_video.mp4 (copie demo1)");
   }
 
   const passwordHash = await bcrypt.hash("demo1234", 12);
@@ -129,6 +149,8 @@ async function main() {
 
   await prisma.message.deleteMany({});
   await prisma.conversation.deleteMany({});
+  await prisma.storyView.deleteMany({});
+  await prisma.story.deleteMany({});
   await prisma.follow.deleteMany({});
   await prisma.comment.deleteMany({});
   await prisma.like.deleteMany({});
@@ -191,6 +213,33 @@ async function main() {
     });
   }
 
+  // Stories (expire in 24h)
+  const storyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await prisma.story.create({
+    data: {
+      userId: demo.id,
+      mediaUrl: "/uploads/stories/story_demo.jpg",
+      caption: "Bonne vibes aujourd'hui ✨",
+      expiresAt: storyExpires,
+    },
+  });
+  await prisma.story.create({
+    data: {
+      userId: alice.id,
+      mediaUrl: "/uploads/stories/story_alice.jpg",
+      caption: "En route ✈️",
+      expiresAt: storyExpires,
+    },
+  });
+  await prisma.story.create({
+    data: {
+      userId: alice.id,
+      mediaUrl: "/uploads/stories/story_demo_video.mp4",
+      caption: "Petit clip story 🎬",
+      expiresAt: storyExpires,
+    },
+  });
+
   // DM threads
   async function seedThread(
     u1: { id: string },
@@ -249,7 +298,7 @@ async function main() {
   console.log("  - alice@cliptok.local / alice");
   console.log("  - bob@cliptok.local / bob");
   console.log("  - charlie@cliptok.local / charlie");
-  console.log(`${SAMPLES.length} vidéos, follows + DMs créés.`);
+  console.log(`${SAMPLES.length} vidéos, stories, follows + DMs créés.`);
 }
 
 main()
