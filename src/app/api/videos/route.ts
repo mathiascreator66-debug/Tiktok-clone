@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getFollowingFeed, getMixedFeed } from "@/lib/feed";
+import { ensureUploadDir } from "@/lib/uploads";
 
 export async function GET(req: NextRequest) {
   try {
@@ -62,8 +63,7 @@ export async function POST(req: NextRequest) {
 
     const ext = path.extname(file.name) || ".mp4";
     const filename = `${randomUUID()}${ext}`;
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadsDir, { recursive: true });
+    const uploadsDir = await ensureUploadDir();
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(path.join(uploadsDir, filename), buffer);
 

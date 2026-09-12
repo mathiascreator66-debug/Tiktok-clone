@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
-import ProfileVideoGrid from "@/components/ProfileVideoGrid";
 import ProfileHeader from "@/components/ProfileHeader";
+import ProfileTabs from "@/components/ProfileTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,6 @@ export default async function ProfilPage({
   const isMe = session?.id === user.id;
   const displayName = user.displayName || user.username;
 
-  // Total likes received on this user's videos
   const likeAgg = await prisma.like.count({
     where: { video: { userId: user.id } },
   });
@@ -54,6 +53,40 @@ export default async function ProfilPage({
     initialFollowing = Boolean(f);
   }
 
+  const now = new Date();
+  const activeStoryCount = await prisma.story.count({
+    where: { userId: user.id, expiresAt: { gt: now } },
+  });
+
+  let likedVideos: {
+    id: string;
+    caption: string;
+    videoUrl: string;
+    likeCount: number;
+    commentCount: number;
+  }[] = [];
+
+  if (isMe) {
+    const likes = await prisma.like.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        video: {
+          include: {
+            _count: { select: { likes: true, comments: true } },
+          },
+        },
+      },
+    });
+    likedVideos = likes.map((l) => ({
+      id: l.video.id,
+      caption: l.video.caption,
+      videoUrl: l.video.videoUrl,
+      likeCount: l.video._count.likes,
+      commentCount: l.video._count.comments,
+    }));
+  }
+
   return (
     <div className="min-h-[100dvh] pt-4 md:pt-20 pb-20 px-4 max-w-2xl mx-auto">
       <ProfileHeader
@@ -67,17 +100,10 @@ export default async function ProfilPage({
         followingCount={user._count.following}
         followerCount={user._count.followers}
         likeCount={likeAgg}
+        hasActiveStories={activeStoryCount > 0}
       />
 
-      <div className="border-b border-white/10 mb-1">
-        <div className="flex justify-center">
-          <div className="px-6 py-2 border-b-2 border-white text-sm font-semibold">
-            Vidéos
-          </div>
-        </div>
-      </div>
-
-      <ProfileVideoGrid
+      <ProfileTabs
         videos={user.videos.map((v) => ({
           id: v.id,
           caption: v.caption,
@@ -85,7 +111,9 @@ export default async function ProfilPage({
           likeCount: v._count.likes,
           commentCount: v._count.comments,
         }))}
+        likedVideos={likedVideos}
         isOwner={isMe}
+        isMe={isMe}
       />
     </div>
   );

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { ensureUploadDir } from "@/lib/uploads";
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const ALLOWED = new Set([
@@ -159,8 +160,7 @@ export async function POST(req: NextRequest) {
             ? ".mp4"
             : ".jpg");
     const filename = `${randomUUID()}${ext}`;
-    const uploadsDir = path.join(process.cwd(), "public", "uploads", "stories");
-    await mkdir(uploadsDir, { recursive: true });
+    const uploadsDir = await ensureUploadDir("stories");
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(path.join(uploadsDir, filename), buffer);
 

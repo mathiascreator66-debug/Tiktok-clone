@@ -10,9 +10,10 @@ export async function GET(
     const session = await getSession();
     const now = new Date();
 
+    const handle = params.username.toLowerCase();
     const user = await prisma.user.findFirst({
       where: {
-        OR: [{ username: params.username }, { id: params.username }],
+        OR: [{ username: handle }, { id: params.username }],
       },
       select: {
         id: true,

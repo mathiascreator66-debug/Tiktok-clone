@@ -4,23 +4,19 @@ import Link from "next/link";
 import { useEffect } from "react";
 import {
   X,
-  Wallet,
   Activity,
   Download,
   QrCode,
-  Briefcase,
   Clapperboard,
-  Flame,
   Settings,
   ChevronRight,
+  Database,
 } from "lucide-react";
 
 type Props = {
   open: boolean;
   onClose: () => void;
 };
-
-const stub = "bientôt";
 
 export default function SettingsDrawer({ open, onClose }: Props) {
   useEffect(() => {
@@ -60,20 +56,40 @@ export default function SettingsDrawer({ open, onClose }: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 py-3">
-          <Section title="Ressources">
-            <StubItem icon={<Wallet size={20} />} label="Solde" hint={stub} />
-          </Section>
-
           <Section title="Outils personnels">
-            <StubItem icon={<Activity size={20} />} label="Centre des activités" hint={stub} />
-            <StubItem icon={<Download size={20} />} label="Vidéos hors ligne" hint={stub} />
-            <StubItem icon={<QrCode size={20} />} label="Ton code QR" hint={stub} />
+            <LinkItem
+              href="/activite"
+              onClick={onClose}
+              icon={<Activity size={20} />}
+              label="Centre des activités"
+            />
+            <LinkItem
+              href="/parametres/qr"
+              onClick={onClose}
+              icon={<QrCode size={20} />}
+              label="Ton code QR"
+            />
+            <LinkItem
+              href="/api/me/export"
+              onClick={onClose}
+              icon={<Database size={20} />}
+              label="Télécharger tes données"
+            />
           </Section>
 
-          <Section title="Création & pro">
-            <StubItem icon={<Briefcase size={20} />} label="Ensemble entreprise" hint={stub} />
-            <StubItem icon={<Clapperboard size={20} />} label="ClipTok Studio" hint={stub} />
-            <StubItem icon={<Flame size={20} />} label="Promouvoir" hint={stub} />
+          <Section title="Création">
+            <LinkItem
+              href="/telecharger"
+              onClick={onClose}
+              icon={<Clapperboard size={20} />}
+              label="ClipTok Studio"
+            />
+            <LinkItem
+              href="/telecharger?tab=story"
+              onClick={onClose}
+              icon={<Download size={20} />}
+              label="Ajouter une story"
+            />
           </Section>
 
           <div className="mt-2 border-t border-white/10 pt-2">
@@ -112,20 +128,26 @@ function Section({
   );
 }
 
-function StubItem({
+function LinkItem({
+  href,
   icon,
   label,
-  hint,
+  onClick,
 }: {
+  href: string;
   icon: React.ReactNode;
   label: string;
-  hint: string;
+  onClick?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 px-3 py-3.5 rounded-lg opacity-55 cursor-not-allowed">
-      <span className="text-white/70">{icon}</span>
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-white/5"
+    >
+      <span className="text-white/80">{icon}</span>
       <span className="flex-1 font-medium text-[15px]">{label}</span>
-      <span className="text-xs text-white/35">{hint}</span>
-    </div>
+      <ChevronRight size={18} className="text-white/30" />
+    </Link>
   );
 }

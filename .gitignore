@@ -49,3 +49,7 @@ next-env.d.ts
 /prisma/dev.db
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# User uploads (served via /uploads route)
+/storage/uploads/**
+!/storage/uploads/.gitkeep

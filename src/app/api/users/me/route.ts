@@ -44,19 +44,22 @@ export async function PATCH(req: NextRequest) {
       const avatarUrl =
         body.avatarUrl == null ? null : String(body.avatarUrl).trim();
       if (avatarUrl) {
-        try {
-          const u = new URL(avatarUrl);
-          if (u.protocol !== "http:" && u.protocol !== "https:") {
+        const isLocal = avatarUrl.startsWith("/uploads/");
+        if (!isLocal) {
+          try {
+            const u = new URL(avatarUrl);
+            if (u.protocol !== "http:" && u.protocol !== "https:") {
+              return NextResponse.json(
+                { error: "URL d'avatar invalide." },
+                { status: 400 }
+              );
+            }
+          } catch {
             return NextResponse.json(
               { error: "URL d'avatar invalide." },
               { status: 400 }
             );
           }
-        } catch {
-          return NextResponse.json(
-            { error: "URL d'avatar invalide." },
-            { status: 400 }
-          );
         }
       }
       data.avatarUrl = avatarUrl || null;

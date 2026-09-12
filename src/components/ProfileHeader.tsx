@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Menu, Pencil, UserPlus } from "lucide-react";
 import Avatar from "./Avatar";
 import FollowButton from "./FollowButton";
 import SettingsDrawer from "./SettingsDrawer";
+import StoryViewer from "./StoryViewer";
 import { formatCount } from "@/lib/format";
+import type { StoryGroup } from "@/lib/types";
 
 type Props = {
   username: string;
@@ -19,6 +21,8 @@ type Props = {
   followingCount: number;
   followerCount: number;
   likeCount: number;
+  /** Server hint — client also refetches for freshness */
+  hasActiveStories?: boolean;
 };
 
 export default function ProfileHeader({
@@ -32,16 +36,53 @@ export default function ProfileHeader({
   followingCount: fc,
   followerCount: fr,
   likeCount,
+  hasActiveStories = false,
 }: Props) {
   const [drawer, setDrawer] = useState(false);
   const followingCount = fc;
   const [followerCount, setFollowerCount] = useState(fr);
   const [following, setFollowing] = useState(initialFollowing);
+  const [storyGroup, setStoryGroup] = useState<StoryGroup | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  const loadStories = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/stories/u/${encodeURIComponent(username)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const stories = data.stories || [];
+      if (!stories.length || !data.user) {
+        setStoryGroup(null);
+        return;
+      }
+      setStoryGroup({
+        user: data.user,
+        stories,
+        hasUnviewed: stories.some((s: { viewedByMe: boolean }) => !s.viewedByMe),
+      });
+    } catch {
+      /* ignore */
+    }
+  }, [username]);
+
+  useEffect(() => {
+    loadStories();
+  }, [loadStories]);
+
+  const hasStories = Boolean(storyGroup?.stories.length) || hasActiveStories;
+  const ringUnviewed = storyGroup?.hasUnviewed ?? hasActiveStories;
+
+  function onAvatarActivate() {
+    if (storyGroup && storyGroup.stories.length > 0) {
+      setViewerOpen(true);
+    }
+  }
 
   return (
     <>
       <div className="relative flex flex-col items-center text-center mb-6 pt-2">
-        {/* Top actions */}
         <div className="absolute top-0 inset-x-0 flex items-center justify-between px-1">
           <div className="w-10">
             {!isMe && isLoggedIn && (
@@ -66,7 +107,29 @@ export default function ProfileHeader({
           )}
         </div>
 
-        <Avatar username={username} avatarUrl={avatarUrl} size={88} />
+        {hasStories ? (
+          <button
+            type="button"
+            onClick={onAvatarActivate}
+            disabled={!storyGroup}
+            className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25f4ee] disabled:opacity-90"
+            aria-label={`Voir les stories de @${username}`}
+          >
+            <div
+              className={`p-[3px] rounded-full ${
+                ringUnviewed
+                  ? "bg-gradient-to-tr from-[#fe2c55] via-[#ff7a45] to-[#25f4ee]"
+                  : "bg-white/35"
+              }`}
+            >
+              <div className="rounded-full bg-black p-[2px]">
+                <Avatar username={username} avatarUrl={avatarUrl} size={88} />
+              </div>
+            </div>
+          </button>
+        ) : (
+          <Avatar username={username} avatarUrl={avatarUrl} size={88} />
+        )}
 
         <div className="flex items-center gap-2 mt-3">
           <h1 className="text-xl font-bold">{displayName}</h1>
@@ -82,7 +145,6 @@ export default function ProfileHeader({
         </div>
         <p className="text-white/50 text-sm">@{username}</p>
 
-        {/* Stats: Suivis / Followers / J'aime */}
         <div className="flex gap-8 mt-4">
           <Stat value={followingCount} label="Suivis" />
           <Stat value={followerCount} label="Followers" />
@@ -156,6 +218,28 @@ export default function ProfileHeader({
 
       {isMe && (
         <SettingsDrawer open={drawer} onClose={() => setDrawer(false)} />
+      )}
+
+      {viewerOpen && storyGroup && (
+        <StoryViewer
+          groups={[storyGroup]}
+          startGroupIndex={0}
+          isLoggedIn={isLoggedIn}
+          onClose={() => setViewerOpen(false)}
+          onViewed={(storyId) => {
+            setStoryGroup((prev) => {
+              if (!prev) return prev;
+              const stories = prev.stories.map((s) =>
+                s.id === storyId ? { ...s, viewedByMe: true } : s
+              );
+              return {
+                ...prev,
+                stories,
+                hasUnviewed: stories.some((s) => !s.viewedByMe),
+              };
+            });
+          }}
+        />
       )}
     </>
   );

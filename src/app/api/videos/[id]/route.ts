@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unlink } from "fs/promises";
-import path from "path";
+import { resolveUploadPath } from "@/lib/uploads";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
@@ -90,12 +90,14 @@ export async function DELETE(
 
     // Supprimer le fichier local s'il est dans /uploads/
     if (video.videoUrl.startsWith("/uploads/")) {
-      const filename = path.basename(video.videoUrl);
-      const filePath = path.join(process.cwd(), "public", "uploads", filename);
-      try {
-        await unlink(filePath);
-      } catch {
-        // Fichier déjà absent — ok
+      const segments = video.videoUrl.replace(/^\/uploads\//, "").split("/").filter(Boolean);
+      const filePath = resolveUploadPath(segments);
+      if (filePath) {
+        try {
+          await unlink(filePath);
+        } catch {
+          // Fichier déjà absent — ok
+        }
       }
     }
 

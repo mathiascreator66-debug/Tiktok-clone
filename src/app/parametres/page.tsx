@@ -3,16 +3,11 @@ import Link from "next/link";
 import {
   ArrowLeft,
   User,
-  Shield,
-  BarChart3,
-  Share2,
-  Bell,
+  QrCode,
   Clapperboard,
-  Tv,
-  Hourglass,
-  Home,
   ChevronRight,
-  Layers,
+  Activity,
+  Download,
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 
@@ -36,12 +31,21 @@ export default async function ParametresPage() {
       </header>
 
       <Section title="Activité">
-        <StubItem icon={<Layers size={20} />} label="Gérer les publications" />
-        <StubItem icon={<Clapperboard size={20} />} label="Préférences de contenu" />
-        <StubItem icon={<Tv size={20} />} label="LIVE" />
-        <StubItem icon={<Bell size={20} />} label="Notifications" />
-        <StubItem icon={<Hourglass size={20} />} label="Temps d'écran et bien-être" />
-        <StubItem icon={<Home size={20} />} label="Connexion Famille" />
+        <LinkItem
+          href="/activite"
+          icon={<Activity size={20} />}
+          label="Centre des activités"
+        />
+        <LinkItem
+          href="/telecharger"
+          icon={<Clapperboard size={20} />}
+          label="Publier une vidéo"
+        />
+        <LinkItem
+          href="/telecharger?tab=story"
+          icon={<Download size={20} />}
+          label="Ajouter une story"
+        />
       </Section>
 
       <Section title="Compte">
@@ -50,9 +54,11 @@ export default async function ParametresPage() {
           icon={<User size={20} />}
           label="Compte"
         />
-        <StubItem icon={<Shield size={20} />} label="Sécurité et autorisations" />
-        <StubItem icon={<BarChart3 size={20} />} label="Données analytiques" />
-        <StubItem icon={<Share2 size={20} />} label="Partager le profil" />
+        <LinkItem
+          href="/parametres/qr"
+          icon={<QrCode size={20} />}
+          label="Partager le profil (QR)"
+        />
       </Section>
     </div>
   );
@@ -95,21 +101,5 @@ function LinkItem({
       <span className="flex-1 font-medium text-[15px]">{label}</span>
       <ChevronRight size={18} className="text-white/30" />
     </Link>
-  );
-}
-
-function StubItem({
-  icon,
-  label,
-}: {
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3.5 opacity-45 cursor-not-allowed">
-      <span className="text-white/70">{icon}</span>
-      <span className="flex-1 font-medium text-[15px]">{label}</span>
-      <span className="text-xs text-white/35">bientôt</span>
-    </div>
   );
 }

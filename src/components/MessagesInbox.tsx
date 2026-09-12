@@ -75,18 +75,16 @@ export default function MessagesInbox() {
         </button>
       </header>
 
-      {/* Stories stub */}
-      <div className="px-4 py-2 overflow-x-auto scrollbar-hide">
-        <div className="flex gap-3">
-          <div className="flex flex-col items-center gap-1 w-16 shrink-0 opacity-50">
-            <div className="w-14 h-14 rounded-full bg-white/10 border-2 border-dashed border-white/30 flex items-center justify-center text-xl">
-              +
-            </div>
-            <span className="text-[10px] text-white/50 truncate w-full text-center">
-              bientôt
-            </span>
-          </div>
-        </div>
+      <div className="px-4 py-2">
+        <Link
+          href="/telecharger?tab=story"
+          className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white"
+        >
+          <span className="w-10 h-10 rounded-full bg-white/10 border-2 border-dashed border-white/30 flex items-center justify-center text-lg leading-none">
+            +
+          </span>
+          Ajouter une story
+        </Link>
       </div>
 
       {/* Tabs */}

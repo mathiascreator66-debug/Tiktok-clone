@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronRight, LogOut } from "lucide-react";
+import { ArrowLeft, ChevronRight, Download, LogOut } from "lucide-react";
 
 type User = {
   email: string;
@@ -149,18 +149,21 @@ export default function AccountSettings({ user }: { user: User }) {
           </div>
           <ChevronRight size={18} className="text-white/30 shrink-0" />
         </button>
-        <StubMenu
-          title="Clé secrète"
-          desc="Passkeys — bientôt disponible."
-        />
-        <StubMenu title="Vérification" desc="bientôt" />
-        <StubMenu
-          title="Compte Entreprise"
-          desc="Non disponible dans ClipTok MVP."
-        />
-        <StubMenu title="Boutique vendeurs" desc="Hors périmètre." />
-        <StubMenu title="Succession du compte" desc="bientôt" />
-        <StubMenu title="Télécharger tes données" desc="bientôt" />
+        <a
+          href="/api/me/export"
+          className="w-full flex items-center justify-between px-4 py-4 hover:bg-white/5 text-left"
+        >
+          <div className="flex items-center gap-3">
+            <Download size={18} className="text-white/60" />
+            <div>
+              <p className="font-medium">Télécharger tes données</p>
+              <p className="text-xs text-white/40 mt-0.5">
+                Export JSON du profil, vidéos, commentaires et abonnements
+              </p>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-white/30 shrink-0" />
+        </a>
       </div>
 
       <button
@@ -250,14 +253,5 @@ function Field({
         className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#25f4ee]/50"
       />
     </label>
-  );
-}
-
-function StubMenu({ title, desc }: { title: string; desc: string }) {
-  return (
-    <div className="px-4 py-4 opacity-40 cursor-not-allowed">
-      <p className="font-medium">{title}</p>
-      <p className="text-xs text-white/40 mt-0.5">{desc}</p>
-    </div>
   );
 }
