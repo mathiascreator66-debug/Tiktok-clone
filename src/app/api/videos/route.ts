@@ -4,13 +4,26 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { getMixedFeed } from "@/lib/feed";
+import { getFollowingFeed, getMixedFeed } from "@/lib/feed";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
-    const feed = await getMixedFeed(session);
-    return NextResponse.json({ videos: feed });
+    const feed = req.nextUrl.searchParams.get("feed");
+
+    if (feed === "following") {
+      if (!session) {
+        return NextResponse.json(
+          { error: "Connexion requise." },
+          { status: 401 }
+        );
+      }
+      const videos = await getFollowingFeed(session);
+      return NextResponse.json({ videos });
+    }
+
+    const videos = await getMixedFeed(session);
+    return NextResponse.json({ videos });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
