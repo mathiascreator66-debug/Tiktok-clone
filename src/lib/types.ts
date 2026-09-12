@@ -26,15 +26,22 @@ export type FeedVideo = {
   } | null;
 };
 
+export type CommentUser = {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+};
+
 export type CommentItem = {
   id: string;
   content: string;
   createdAt: string;
-  user: {
-    id: string;
-    username: string;
-    avatarUrl: string | null;
-  };
+  parentId: string | null;
+  imageUrl: string | null;
+  likeCount: number;
+  likedByMe: boolean;
+  user: CommentUser;
+  replies: CommentItem[];
 };
 
 export type StoryItem = {

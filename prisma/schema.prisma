@@ -20,6 +20,7 @@ model User {
   videos       Video[]
   likes        Like[]
   comments     Comment[]
+  commentLikes CommentLike[]
   reposts      Repost[]
   following    Follow[]  @relation("Following")
   followers    Follow[]  @relation("Followers")
@@ -54,13 +55,33 @@ model Like {
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
   content   String
+  imageUrl  String?
   userId    String
   videoId   String
+  parentId  String?
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video         @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[]     @relation("CommentReplies")
+  likes     CommentLike[]
+
+  @@index([videoId, createdAt])
+  @@index([parentId])
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  commentId String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
 }
 
 model Repost {

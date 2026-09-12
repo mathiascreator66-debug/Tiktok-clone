@@ -152,6 +152,7 @@ async function main() {
   await prisma.storyView.deleteMany({});
   await prisma.story.deleteMany({});
   await prisma.follow.deleteMany({});
+  await prisma.commentLike.deleteMany({});
   await prisma.comment.deleteMany({});
   await prisma.like.deleteMany({});
   await prisma.repost.deleteMany({});
@@ -181,17 +182,58 @@ async function main() {
     });
   }
 
-  const videos = await prisma.video.findMany();
+  // Ensure comments upload dir + demo image for image comments
+  const commentsDir = path.join(uploadsDir, "comments");
+  await mkdir(commentsDir, { recursive: true });
+  const commentImg = path.join(commentsDir, "seed_map.jpg");
+  try {
+    await access(commentImg);
+  } catch {
+    try {
+      const { copyFile } = await import("fs/promises");
+      await copyFile(path.join(storiesDir, "story_demo.jpg"), commentImg);
+      console.log("  OK seed_map.jpg (copie story)");
+    } catch {
+      console.log("  (pas d'image commentaire démo)");
+    }
+  }
+
+  const videos = await prisma.video.findMany({ orderBy: { createdAt: "asc" } });
   if (videos[0]) {
     await prisma.like.create({
       data: { userId: alice.id, videoId: videos[0].id },
     });
-    await prisma.comment.create({
+    const c1 = await prisma.comment.create({
       data: {
         content: "Trop stylé ! 👏",
         userId: bob.id,
         videoId: videos[0].id,
       },
+    });
+    const c1r = await prisma.comment.create({
+      data: {
+        content: "@bob Merci ! Content que ça te plaise 🔥",
+        userId: demo.id,
+        videoId: videos[0].id,
+        parentId: c1.id,
+      },
+    });
+    await prisma.comment.create({
+      data: {
+        content: "Carrément d'accord avec Bob",
+        userId: alice.id,
+        videoId: videos[0].id,
+        parentId: c1.id,
+      },
+    });
+    await prisma.commentLike.create({
+      data: { userId: alice.id, commentId: c1.id },
+    });
+    await prisma.commentLike.create({
+      data: { userId: demo.id, commentId: c1.id },
+    });
+    await prisma.commentLike.create({
+      data: { userId: bob.id, commentId: c1r.id },
     });
     await prisma.repost.create({
       data: { userId: bob.id, videoId: videos[0].id },
@@ -204,12 +246,37 @@ async function main() {
     await prisma.like.create({
       data: { userId: demo.id, videoId: videos[1].id },
     });
-    await prisma.comment.create({
+    const c2 = await prisma.comment.create({
       data: {
         content: "J'adore cette vidéo ❤️",
         userId: alice.id,
         videoId: videos[1].id,
       },
+    });
+    await prisma.comment.create({
+      data: {
+        content: "Regarde où j'étais 📍",
+        userId: bob.id,
+        videoId: videos[1].id,
+        imageUrl: "/uploads/comments/seed_map.jpg",
+      },
+    });
+    await prisma.comment.create({
+      data: {
+        content: "@alice Same here 😍",
+        userId: charlie.id,
+        videoId: videos[1].id,
+        parentId: c2.id,
+      },
+    });
+    await prisma.commentLike.create({
+      data: { userId: bob.id, commentId: c2.id },
+    });
+    await prisma.commentLike.create({
+      data: { userId: demo.id, commentId: c2.id },
+    });
+    await prisma.commentLike.create({
+      data: { userId: charlie.id, commentId: c2.id },
     });
   }
 
@@ -298,7 +365,7 @@ async function main() {
   console.log("  - alice@cliptok.local / alice");
   console.log("  - bob@cliptok.local / bob");
   console.log("  - charlie@cliptok.local / charlie");
-  console.log(`${SAMPLES.length} vidéos, stories, follows + DMs créés.`);
+  console.log(`${SAMPLES.length} vidéos, commentaires filés, stories, follows + DMs créés.`);
 }
 
 main()

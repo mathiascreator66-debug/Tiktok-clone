@@ -9,6 +9,7 @@ import {
   Repeat2,
   Volume2,
   VolumeX,
+  Music2,
 } from "lucide-react";
 import Avatar from "./Avatar";
 import CommentPanel from "./CommentPanel";
@@ -46,6 +47,10 @@ export default function VideoCard({
   const [reposting, setReposting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [hidden, setHidden] = useState(false);
+  const [heartBurst, setHeartBurst] = useState(false);
+  const lastTapRef = useRef(0);
+  const muteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const likingRef = useRef(false);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -65,24 +70,60 @@ export default function VideoCard({
     }
   }, [muted, hasInteracted]);
 
-  async function toggleLike(e: React.MouseEvent) {
-    e.stopPropagation();
+  async function doLike(forceLike = false) {
     if (!isLoggedIn) {
       window.location.href = "/connexion";
       return;
     }
-    if (liking) return;
+    if (likingRef.current) return;
+    if (forceLike && liked) return;
+
+    likingRef.current = true;
     setLiking(true);
     const prevLiked = liked;
     const prevCount = likeCount;
-    setLiked(!liked);
-    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+    const nextLiked = forceLike ? true : !liked;
+    setLiked(nextLiked);
+    setLikeCount(
+      forceLike
+        ? liked
+          ? likeCount
+          : likeCount + 1
+        : liked
+          ? likeCount - 1
+          : likeCount + 1
+    );
     try {
-      const res = await fetch(`/api/videos/${video.id}/like`, { method: "POST", credentials: "include" });
+      // If forceLike and already liked, skip API
+      if (forceLike && prevLiked) {
+        return;
+      }
+      // If forceLike and not liked, or toggle: hit API
+      // For forceLike when not liked, we need to like. For toggle when liked, unlike.
+      // Problem: toggle API always toggles. So if we want forceLike and already liked, we skip.
+      // If forceLike and not liked, toggle will like — good.
+      // If not forceLike, toggle — good.
+      const res = await fetch(`/api/videos/${video.id}/like`, {
+        method: "POST",
+        credentials: "include",
+      });
       const data = await res.json();
       if (!res.ok) {
         setLiked(prevLiked);
         setLikeCount(prevCount);
+        return;
+      }
+      // If forceLike requested like but API returned unliked (race), re-toggle
+      if (forceLike && !data.liked) {
+        const res2 = await fetch(`/api/videos/${video.id}/like`, {
+          method: "POST",
+          credentials: "include",
+        });
+        const data2 = await res2.json();
+        if (res2.ok) {
+          setLiked(data2.liked);
+          setLikeCount(data2.likeCount);
+        }
         return;
       }
       setLiked(data.liked);
@@ -91,8 +132,19 @@ export default function VideoCard({
       setLiked(prevLiked);
       setLikeCount(prevCount);
     } finally {
+      likingRef.current = false;
       setLiking(false);
     }
+  }
+
+  async function toggleLike(e: React.MouseEvent) {
+    e.stopPropagation();
+    await doLike(false);
+  }
+
+  function showHeartBurst() {
+    setHeartBurst(true);
+    setTimeout(() => setHeartBurst(false), 800);
   }
 
   async function toggleRepost(e: React.MouseEvent) {
@@ -156,12 +208,33 @@ export default function VideoCard({
 
   function handleTap() {
     if (commentsOpen) return;
-    onInteract();
-    if (!hasInteracted) {
-      setMuted(false);
-    } else {
-      setMuted((m) => !m);
+    const now = Date.now();
+    const delta = now - lastTapRef.current;
+    lastTapRef.current = now;
+
+    if (delta < 280 && delta > 0) {
+      if (muteTimerRef.current) {
+        clearTimeout(muteTimerRef.current);
+        muteTimerRef.current = null;
+      }
+      // Double-tap → like + heart animation
+      showHeartBurst();
+      void doLike(true);
+      onInteract();
+      return;
     }
+
+    // Delay single-tap mute so a double-tap can cancel it
+    if (muteTimerRef.current) clearTimeout(muteTimerRef.current);
+    muteTimerRef.current = setTimeout(() => {
+      muteTimerRef.current = null;
+      onInteract();
+      if (!hasInteracted) {
+        setMuted(false);
+      } else {
+        setMuted((m) => !m);
+      }
+    }, 280);
   }
 
   if (hidden) return null;
@@ -183,6 +256,24 @@ export default function VideoCard({
 
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/20" />
 
+      {/* Double-tap heart burst */}
+      {heartBurst && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+          <Heart
+            size={96}
+            className="fill-[#fe2c55] text-[#fe2c55] drop-shadow-lg animate-ping"
+            style={{ animationDuration: "0.6s", animationIterationCount: 1 }}
+          />
+          <Heart
+            size={88}
+            className="absolute fill-[#fe2c55] text-[#fe2c55] drop-shadow-2xl scale-100 opacity-90"
+            style={{
+              animation: "cliptok-heart-pop 0.7s ease-out forwards",
+            }}
+          />
+        </div>
+      )}
+
       {/* Right actions */}
       <div className="absolute right-3 bottom-28 md:bottom-24 flex flex-col items-center gap-4 z-20">
         <Link href={`/profil/${video.user.username}`} className="mb-1">
@@ -196,6 +287,7 @@ export default function VideoCard({
         <button
           type="button"
           onClick={toggleLike}
+          disabled={liking}
           className="flex flex-col items-center gap-1 group"
           aria-label="J'aime"
         >
@@ -265,7 +357,7 @@ export default function VideoCard({
         )}
       </div>
 
-      {/* Bottom caption */}
+      {/* Bottom caption + music */}
       <div className="absolute left-0 right-16 bottom-16 md:bottom-20 px-4 z-20 pointer-events-none">
         {video.repost && (
           <p className="text-xs text-white/60 mb-1 flex items-center gap-1 pointer-events-auto">
@@ -292,6 +384,12 @@ export default function VideoCard({
             )}
         </Link>
         <p className="text-sm mt-1 text-white/90 line-clamp-3">{caption}</p>
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-white/70 truncate">
+          <Music2 size={12} className="shrink-0 opacity-80" />
+          <span className="truncate">
+            Son original — @{video.user.username}
+          </span>
+        </p>
       </div>
 
       <button
@@ -312,6 +410,10 @@ export default function VideoCard({
       />
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+
+      <style dangerouslySetInnerHTML={{
+        __html: `@keyframes cliptok-heart-pop{0%{transform:scale(.3);opacity:0}40%{transform:scale(1.15);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(1.4);opacity:0}}`,
+      }} />
     </div>
   );
 }
