@@ -3,6 +3,11 @@ export const MAX_UPLOAD_BYTES = 104_857_600;
 export const MAX_UPLOAD_MB = 100;
 export const MAX_UPLOAD_LABEL = "100 Mo";
 
+/** Duration caps (WAVE 1) */
+export const MAX_VIDEO_DURATION_SEC = 8 * 60; // 8 minutes
+export const MAX_STORY_DURATION_SEC = 3 * 60; // 3 minutes
+export const MIN_AGE = 13;
+
 /** Bio max — must stay ≥ 250. */
 export const BIO_MAX_LENGTH = 250;
 
@@ -23,8 +28,17 @@ export const REPORT_REASONS = [
   { id: "other", label: "Autre" },
 ] as const;
 
+export const REPORT_TARGET_TYPES = ["video", "user", "comment", "story"] as const;
+export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
+
 export function formatBytesFr(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} Mo`;
+}
+
+export function formatDurationLabel(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }

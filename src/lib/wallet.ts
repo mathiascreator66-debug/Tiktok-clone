@@ -233,7 +233,7 @@ export async function activatePro(opts: {
         amountCents: -PRO_COST_CENTS,
         meta: JSON.stringify({
           demo: true,
-          note: "ClipTok Pro 7 jours — démo crédits virtuels",
+          note: "AfriVoix Pro 7 jours — démo crédits virtuels",
           trial: false,
           proUntil: proUntil.toISOString(),
         }),

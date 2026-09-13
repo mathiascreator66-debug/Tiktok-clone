@@ -120,7 +120,7 @@ export async function GET() {
       status: 200,
       headers: {
         "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": `attachment; filename="cliptok-${user.username}-export.json"`,
+        "Content-Disposition": `attachment; filename="afrivoix-${user.username}-export.json"`,
         "Cache-Control": "no-store",
       },
     });

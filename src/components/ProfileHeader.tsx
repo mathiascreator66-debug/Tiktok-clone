@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Gift, Link as LinkIcon, Menu, Pencil, UserPlus, Sparkles } from "lucide-react";
+import { Gift, Flag, Link as LinkIcon, Menu, Pencil, UserPlus, Sparkles } from "lucide-react";
 import type { ProfileLinkItem } from "@/lib/types";
 import Avatar from "./Avatar";
 import FollowButton from "./FollowButton";
@@ -45,6 +45,8 @@ export default function ProfileHeader({
   links = [],
 }: Props) {
   const [drawer, setDrawer] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportMsg, setReportMsg] = useState<string | null>(null);
   const [tipOpen, setTipOpen] = useState(false);
   const followingCount = fc;
   const [followerCount, setFollowerCount] = useState(fr);
@@ -84,6 +86,23 @@ export default function ProfileHeader({
   function onAvatarActivate() {
     if (storyGroup && storyGroup.stories.length > 0) {
       setViewerOpen(true);
+    }
+  }
+
+
+  async function reportUser(reason: string) {
+    setReportMsg(null);
+    const res = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetType: "user", targetId: username, reason }),
+    });
+    if (res.ok) {
+      setReportMsg("Signalement envoyé");
+      setReportOpen(false);
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setReportMsg(d.error || "Échec du signalement");
     }
   }
 
@@ -280,9 +299,40 @@ export default function ProfileHeader({
                   <Gift size={14} className="text-[#fe2c55]" /> Offrir
                 </Link>
               )}
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  onClick={() => setReportOpen((v) => !v)}
+                  className="inline-flex items-center gap-1 bg-white/10 border border-white/15 px-3 py-2 rounded-md text-sm"
+                  aria-label="Signaler"
+                >
+                  <Flag size={14} />
+                </button>
+              )}
             </>
           )}
         </div>
+        {reportMsg && <p className="text-xs text-[#d4af37] mt-2">{reportMsg}</p>}
+        {reportOpen && (
+          <div className="mt-2 rounded-xl border border-white/10 bg-black/80 p-3 space-y-1.5">
+            <p className="text-xs text-white/50 mb-1">Signaler @{username}</p>
+            {[
+              ["spam", "Spam"],
+              ["hate", "Haine / harcèlement"],
+              ["violence", "Violence"],
+              ["other", "Autre"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className="block w-full text-left text-sm px-2 py-1.5 rounded hover:bg-white/10"
+                onClick={() => reportUser(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {isMe && (

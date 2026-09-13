@@ -5,7 +5,9 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { ensureUploadDir } from "@/lib/uploads";
-import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/limits";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, MAX_STORY_DURATION_SEC } from "@/lib/limits";
+import { parseClientDuration, probeDurationSeconds } from "@/lib/duration";
+import { safeError } from "@/lib/safe-log";
 
 const MAX_BYTES = MAX_UPLOAD_BYTES;
 const ALLOWED = new Set([
@@ -112,7 +114,7 @@ export async function GET() {
       })),
     });
   } catch (e) {
-    console.error(e);
+    safeError(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }
@@ -163,7 +165,27 @@ export async function POST(req: NextRequest) {
     const filename = `${randomUUID()}${ext}`;
     const uploadsDir = await ensureUploadDir("stories");
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(path.join(uploadsDir, filename), buffer);
+    const fullPath = path.join(uploadsDir, filename);
+    await writeFile(fullPath, buffer);
+
+    const clientDuration = parseClientDuration(form.get("durationSec"));
+    let durationSec = clientDuration;
+    const isVid = file.type.startsWith("video/") || ext.toLowerCase() === ".mp4";
+    if (isVid) {
+      const probed = await probeDurationSeconds(fullPath);
+      if (probed != null) durationSec = probed;
+      if (
+        (durationSec != null && durationSec > MAX_STORY_DURATION_SEC + 1) ||
+        (clientDuration != null && clientDuration > MAX_STORY_DURATION_SEC + 1)
+      ) {
+        const { unlink } = await import("fs/promises");
+        await unlink(fullPath).catch(() => {});
+        return NextResponse.json(
+          { error: `Story trop longue (max ${MAX_STORY_DURATION_SEC / 60} minutes).` },
+          { status: 400 }
+        );
+      }
+    }
 
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
@@ -173,6 +195,7 @@ export async function POST(req: NextRequest) {
         userId: session.id,
         mediaUrl: `/uploads/stories/${filename}`,
         caption,
+        durationSec: durationSec ?? null,
         createdAt,
         expiresAt,
       },
@@ -200,7 +223,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e) {
-    console.error(e);
+    safeError(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }

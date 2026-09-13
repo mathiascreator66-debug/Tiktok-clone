@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { findOrCreateConversation } from "@/lib/messages";
+import { encryptMessageBody, decryptMessageBody } from "@/lib/crypto-messages";
 
 type Ctx = { params: { username: string } };
 
@@ -67,7 +68,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       iFollowThem,
       messages: messages.map((m) => ({
         id: m.id,
-        body: m.body,
+        body: decryptMessageBody(m.body),
         senderId: m.senderId,
         senderUsername: m.sender.username,
         createdAt: m.createdAt.toISOString(),
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       data: {
         conversationId: conv.id,
         senderId: session.id,
-        body: text,
+        body: encryptMessageBody(text),
       },
     });
     await prisma.conversation.update({
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({
       message: {
         id: message.id,
-        body: message.body,
+        body: decryptMessageBody(message.body),
         senderId: message.senderId,
         createdAt: message.createdAt.toISOString(),
         readAt: null,

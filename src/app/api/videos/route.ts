@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
+import { writeFile, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getFollowingFeed, getMixedFeed } from "@/lib/feed";
 import { ensureUploadDir } from "@/lib/uploads";
-import { CAPTION_MAX_LENGTH, MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/limits";
+import {
+  CAPTION_MAX_LENGTH,
+  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_LABEL,
+  MAX_VIDEO_DURATION_SEC,
+} from "@/lib/limits";
 import { originalSoundName, soundLabel } from "@/lib/sounds";
+import { syncVideoHashtags } from "@/lib/hashtags";
+import { parseClientDuration, probeDurationSeconds } from "@/lib/duration";
+import { safeError } from "@/lib/safe-log";
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,7 +36,7 @@ export async function GET(req: NextRequest) {
     const videos = await getMixedFeed(session);
     return NextResponse.json({ videos });
   } catch (e) {
-    console.error(e);
+    safeError(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }
@@ -44,6 +52,7 @@ export async function POST(req: NextRequest) {
     const caption = String(form.get("caption") || "").trim();
     const file = form.get("video") as File | null;
     const soundRaw = String(form.get("soundName") || "").trim();
+    const clientDuration = parseClientDuration(form.get("durationSec"));
 
     if (!caption) {
       return NextResponse.json({ error: "Légende requise." }, { status: 400 });
@@ -70,11 +79,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (clientDuration != null && clientDuration > MAX_VIDEO_DURATION_SEC + 1) {
+      return NextResponse.json(
+        {
+          error: `Vidéo trop longue (max ${MAX_VIDEO_DURATION_SEC / 60} minutes).`,
+        },
+        { status: 400 }
+      );
+    }
+
     const ext = path.extname(file.name) || ".mp4";
     const filename = `${randomUUID()}${ext}`;
     const uploadsDir = await ensureUploadDir();
+    const fullPath = path.join(uploadsDir, filename);
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(path.join(uploadsDir, filename), buffer);
+    await writeFile(fullPath, buffer);
+
+    let durationSec = clientDuration;
+    const probed = await probeDurationSeconds(fullPath);
+    if (probed != null) durationSec = probed;
+
+    if (durationSec != null && durationSec > MAX_VIDEO_DURATION_SEC + 1) {
+      await unlink(fullPath).catch(() => {});
+      return NextResponse.json(
+        {
+          error: `Vidéo trop longue (max ${MAX_VIDEO_DURATION_SEC / 60} minutes).`,
+        },
+        { status: 400 }
+      );
+    }
 
     const soundName = soundLabel(soundRaw, session.username);
 
@@ -84,6 +117,7 @@ export async function POST(req: NextRequest) {
         videoUrl: `/uploads/${filename}`,
         soundName: soundName || originalSoundName(session.username),
         userId: session.id,
+        durationSec: durationSec ?? null,
       },
       include: {
         user: {
@@ -92,10 +126,13 @@ export async function POST(req: NextRequest) {
             username: true,
             displayName: true,
             avatarUrl: true,
+            isVerified: true,
           },
         },
       },
     });
+
+    const tags = await syncVideoHashtags(video.id, caption);
 
     return NextResponse.json({
       video: {
@@ -114,12 +151,13 @@ export async function POST(req: NextRequest) {
         isOwner: true,
         pinned: false,
         boostedUntil: null,
+        hashtags: tags,
         user: video.user,
         repost: null,
       },
     });
   } catch (e) {
-    console.error(e);
+    safeError(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }

@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, ImagePlus } from "lucide-react";
-import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, formatBytesFr } from "@/lib/limits";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, MAX_STORY_DURATION_SEC, formatBytesFr } from "@/lib/limits";
 
 export default function StoryUploadForm() {
   const router = useRouter();
@@ -14,6 +14,7 @@ export default function StoryUploadForm() {
   const [isVideo, setIsVideo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [durationSec, setDurationSec] = useState<number | null>(null);
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -24,9 +25,29 @@ export default function StoryUploadForm() {
     }
     if (preview) URL.revokeObjectURL(preview);
     setFile(f);
-    setIsVideo(f.type.startsWith("video/"));
-    setPreview(URL.createObjectURL(f));
+    const isVid = f.type.startsWith("video/");
+    setIsVideo(isVid);
+    const url = URL.createObjectURL(f);
+    setPreview(url);
+    setDurationSec(null);
     setError("");
+    if (isVid) {
+      const vid = document.createElement("video");
+      vid.preload = "metadata";
+      vid.onloadedmetadata = () => {
+        const d = vid.duration;
+        URL.revokeObjectURL(vid.src);
+        if (Number.isFinite(d)) {
+          setDurationSec(d);
+          if (d > MAX_STORY_DURATION_SEC + 1) {
+            setError(`Story trop longue (max ${MAX_STORY_DURATION_SEC / 60} min).`);
+            setFile(null);
+            setPreview(null);
+          }
+        }
+      };
+      vid.src = url;
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -45,6 +66,7 @@ export default function StoryUploadForm() {
       const form = new FormData();
       if (caption.trim()) form.append("caption", caption.trim());
       form.append("media", file);
+      if (durationSec != null) form.append("durationSec", String(durationSec));
       const res = await fetch("/api/stories", {
         method: "POST",
         body: form,

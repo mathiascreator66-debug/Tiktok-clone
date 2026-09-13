@@ -12,7 +12,11 @@ import {
   Wallet,
   Sparkles,
   Rocket,
+  Info,
+  HelpCircle,
+  FileText,
 } from "lucide-react";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +52,7 @@ export default async function ParametresPage() {
         <LinkItem
           href="/telecharger"
           icon={<Clapperboard size={20} />}
-          label="ClipTok Studio"
+          label="AfriVoix Studio"
         />
         <LinkItem
           href="/telecharger?tab=story"
@@ -67,7 +71,7 @@ export default async function ParametresPage() {
         <LinkItem
           href="/pro"
           icon={<Sparkles size={20} />}
-          label="ClipTok Pro"
+          label="AfriVoix Pro"
         />
         <LinkItem
           href="/pro#promouvoir"
@@ -87,6 +91,20 @@ export default async function ParametresPage() {
           label="Partager le profil (QR)"
         />
       </Section>
+
+      <Section title="Aide et légal">
+        <LinkItem href="/a-propos" icon={<Info size={20} />} label="À propos d'AfriVoix" />
+        <LinkItem href="/aide" icon={<HelpCircle size={20} />} label="Centre d'aide" />
+        <LinkItem href="/cgu" icon={<FileText size={20} />} label="Conditions d'utilisation" />
+        <LinkItem href="/confidentialite" icon={<FileText size={20} />} label="Confidentialité" />
+      </Section>
+
+      <Section title="Langue">
+        <div className="px-4 py-3">
+          <LanguageSwitcher />
+        </div>
+      </Section>
+
     </div>
   );
 }

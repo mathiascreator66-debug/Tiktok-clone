@@ -7,6 +7,7 @@ import {
   CAPTION_MAX_LENGTH,
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_LABEL,
+  MAX_VIDEO_DURATION_SEC,
   formatBytesFr,
 } from "@/lib/limits";
 import { originalSoundName } from "@/lib/sounds";
@@ -21,6 +22,7 @@ export default function UploadForm({ username }: { username: string }) {
   const [soundName, setSoundName] = useState(originalSoundName(username));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [durationSec, setDurationSec] = useState<number | null>(null);
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -31,8 +33,25 @@ export default function UploadForm({ username }: { username: string }) {
     }
     if (preview) URL.revokeObjectURL(preview);
     setFile(f);
-    setPreview(URL.createObjectURL(f));
+    const url = URL.createObjectURL(f);
+    setPreview(url);
+    setDurationSec(null);
     setError("");
+    const vid = document.createElement("video");
+    vid.preload = "metadata";
+    vid.onloadedmetadata = () => {
+      const d = vid.duration;
+      URL.revokeObjectURL(vid.src);
+      if (Number.isFinite(d)) {
+        setDurationSec(d);
+        if (d > MAX_VIDEO_DURATION_SEC + 1) {
+          setError(`Vidéo trop longue (max ${MAX_VIDEO_DURATION_SEC / 60} min).`);
+          setFile(null);
+          setPreview(null);
+        }
+      }
+    };
+    vid.src = url;
   }
 
   async function submit(e: React.FormEvent) {
@@ -45,6 +64,10 @@ export default function UploadForm({ username }: { username: string }) {
       setError(`Vidéo trop lourde (max ${MAX_UPLOAD_LABEL}).`);
       return;
     }
+    if (durationSec != null && durationSec > MAX_VIDEO_DURATION_SEC + 1) {
+      setError(`Vidéo trop longue (max ${MAX_VIDEO_DURATION_SEC / 60} min).`);
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -52,6 +75,7 @@ export default function UploadForm({ username }: { username: string }) {
       form.append("caption", caption);
       form.append("video", file);
       form.append("soundName", soundName);
+      if (durationSec != null) form.append("durationSec", String(durationSec));
       const res = await fetch("/api/videos", {
         method: "POST",
         body: form,
@@ -96,7 +120,7 @@ export default function UploadForm({ username }: { username: string }) {
               Appuyez pour choisir une vidéo
             </p>
             <p className="text-white/30 text-xs mt-2">
-              MP4, WebM, MOV — max {MAX_UPLOAD_LABEL} (104 857 600 octets)
+              MP4, WebM, MOV — max {MAX_UPLOAD_LABEL}, {MAX_VIDEO_DURATION_SEC / 60} min
             </p>
           </>
         )}

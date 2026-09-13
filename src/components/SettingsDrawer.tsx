@@ -15,6 +15,8 @@ import {
   Wallet,
   Rocket,
   Sparkles,
+  Info,
+  HelpCircle,
 } from "lucide-react";
 
 type Props = {
@@ -99,7 +101,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
               href="/pro"
               onClick={onClose}
               icon={<Sparkles size={20} />}
-              label="ClipTok Pro"
+              label="AfriVoix Pro"
             />
             <LinkItem
               href="/pro#promouvoir"
@@ -113,7 +115,7 @@ export default function SettingsDrawer({ open, onClose }: Props) {
               href="/telecharger"
               onClick={onClose}
               icon={<Clapperboard size={20} />}
-              label="ClipTok Studio"
+              label="AfriVoix Studio"
             />
             <LinkItem
               href="/telecharger?tab=story"
@@ -121,6 +123,12 @@ export default function SettingsDrawer({ open, onClose }: Props) {
               icon={<Download size={20} />}
               label="Ajouter une story"
             />
+          </Section>
+
+          <Section title="AfriVoix">
+            <LinkItem href="/a-propos" onClick={onClose} icon={<Info size={20} />} label="À propos" />
+            <LinkItem href="/aide" onClick={onClose} icon={<HelpCircle size={20} />} label="Centre d'aide" />
+            <LinkItem href="/cgu" onClick={onClose} icon={<Info size={20} />} label="CGU" />
           </Section>
 
           <div className="mt-2 border-t border-white/10 pt-2">

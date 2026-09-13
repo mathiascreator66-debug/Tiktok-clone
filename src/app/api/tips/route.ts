@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authRateLimit } from "@/lib/rate-limit";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendTip, TIP_AMOUNTS_CENTS } from "@/lib/wallet";
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = authRateLimit(req, "tips");
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: `Trop de pourboires. Réessayez dans ${limited.retryAfterSec}s.` },
+        { status: 429 }
+      );
+    }
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "Connexion requise." }, { status: 401 });

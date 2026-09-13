@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { REPORT_REASONS } from "@/lib/limits";
+import { safeError } from "@/lib/safe-log";
 
 const VALID = new Set<string>(REPORT_REASONS.map((r) => r.id));
 
@@ -27,12 +28,19 @@ export async function POST(
     }
 
     await prisma.report.create({
-      data: { userId: session.id, videoId: params.id, reason },
+      data: {
+        userId: session.id,
+        targetType: "video",
+        targetId: params.id,
+        videoId: params.id,
+        reason,
+        status: "open",
+      },
     });
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error(e);
+    safeError(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }

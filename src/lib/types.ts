@@ -14,12 +14,14 @@ export type FeedVideo = {
   isOwner: boolean;
   pinned: boolean;
   boostedUntil: string | null;
+  hashtags?: string[];
   user: {
     id: string;
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
     isPro?: boolean;
+    isVerified?: boolean;
   };
   /** Présent si cet élément du fil est une republication */
   repost?: {

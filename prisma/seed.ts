@@ -43,7 +43,7 @@ async function downloadIfNeeded(url: string, dest: string) {
   }
   console.log(`  téléchargement: ${path.basename(dest)}...`);
   const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; ClipTokSeed/1.0)" },
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; AfriVoixSeed/1.0)" },
     redirect: "follow",
   });
   if (!res.ok) throw new Error(`Échec téléchargement ${url}: ${res.status}`);
@@ -69,11 +69,11 @@ async function main() {
 
   console.log("Téléchargement des stories démo...");
   await downloadIfNeeded(
-    "https://picsum.photos/seed/cliptok1/720/1280.jpg",
+    "https://picsum.photos/seed/afrivoix1/720/1280.jpg",
     path.join(storiesDir, "story_demo.jpg")
   );
   await downloadIfNeeded(
-    "https://picsum.photos/seed/cliptok2/720/1280.jpg",
+    "https://picsum.photos/seed/afrivoix2/720/1280.jpg",
     path.join(storiesDir, "story_alice.jpg")
   );
   const storyDemoVideo = path.join(storiesDir, "story_demo_video.mp4");
@@ -87,32 +87,53 @@ async function main() {
 
   const passwordHash = await bcrypt.hash("demo1234", 12);
 
+  // Migrate legacy ClipTok demo emails → AfriVoix
+  const emailMap: [string, string][] = [
+    ["demo@cliptok.local", "demo@afrivoix.local"],
+    ["alice@cliptok.local", "alice@afrivoix.local"],
+    ["bob@cliptok.local", "bob@afrivoix.local"],
+    ["charlie@cliptok.local", "charlie@afrivoix.local"],
+  ];
+  for (const [oldEmail, newEmail] of emailMap) {
+    const old = await prisma.user.findUnique({ where: { email: oldEmail } });
+    if (old) {
+      const clash = await prisma.user.findUnique({ where: { email: newEmail } });
+      if (!clash) {
+        await prisma.user.update({
+          where: { email: oldEmail },
+          data: { email: newEmail },
+        });
+      }
+    }
+  }
+
+
   const demo = await prisma.user.upsert({
-    where: { email: "demo@cliptok.local" },
+    where: { email: "demo@afrivoix.local" },
     update: {
-      bio: "Compte démo ClipTok 🎬 — fil, stories, DMs, solde démo et monétisation. Bio jusqu’à 250 caractères.",
+      bio: "Compte démo AfriVoix 🎬 — fil, stories, DMs, solde démo et monétisation. Bio jusqu’à 250 caractères.",
       displayName: "Démo",
       balanceCents: 1000,
     },
     create: {
-      email: "demo@cliptok.local",
+      email: "demo@afrivoix.local",
       username: "demo",
       passwordHash,
-      bio: "Compte démo ClipTok 🎬 — fil, stories, DMs, solde démo et monétisation. Bio jusqu’à 250 caractères.",
+      bio: "Compte démo AfriVoix 🎬 — fil, stories, DMs, solde démo et monétisation. Bio jusqu’à 250 caractères.",
       displayName: "Démo",
       balanceCents: 1000,
     },
   });
 
   const alice = await prisma.user.upsert({
-    where: { email: "alice@cliptok.local" },
+    where: { email: "alice@afrivoix.local" },
     update: {
       bio: "Créatrice de contenus · voyage & lifestyle. Liens dans la bio ✨",
       displayName: "Alice",
       balanceCents: 500,
     },
     create: {
-      email: "alice@cliptok.local",
+      email: "alice@afrivoix.local",
       username: "alice",
       passwordHash,
       bio: "Créatrice de contenus · voyage & lifestyle. Liens dans la bio ✨",
@@ -122,13 +143,13 @@ async function main() {
   });
 
   const bob = await prisma.user.upsert({
-    where: { email: "bob@cliptok.local" },
+    where: { email: "bob@afrivoix.local" },
     update: {
       bio: "Fan de cinéma open source 🎞️",
       displayName: "Bob",
     },
     create: {
-      email: "bob@cliptok.local",
+      email: "bob@afrivoix.local",
       username: "bob",
       passwordHash,
       bio: "Fan de cinéma open source 🎞️",
@@ -137,20 +158,54 @@ async function main() {
   });
 
   const charlie = await prisma.user.upsert({
-    where: { email: "charlie@cliptok.local" },
+    where: { email: "charlie@afrivoix.local" },
     update: {
-      bio: "Nouveau sur ClipTok — suggestions & demandes",
+      bio: "Nouveau sur AfriVoix — suggestions & demandes",
       displayName: "Charlie",
     },
     create: {
-      email: "charlie@cliptok.local",
+      email: "charlie@afrivoix.local",
       username: "charlie",
       passwordHash,
-      bio: "Nouveau sur ClipTok — suggestions & demandes",
+      bio: "Nouveau sur AfriVoix — suggestions & demandes",
       displayName: "Charlie",
     },
   });
 
+  
+  const admin = await prisma.user.upsert({
+    where: { email: "admin@afrivoix.local" },
+    update: {
+      bio: "Administrateur AfriVoix",
+      displayName: "Admin",
+      isAdmin: true,
+      isModerator: true,
+      isVerified: true,
+      accountStatus: "ACTIVE",
+      country: "SN",
+      language: "fr",
+    },
+    create: {
+      email: "admin@afrivoix.local",
+      username: "admin",
+      passwordHash,
+      bio: "Administrateur AfriVoix",
+      displayName: "Admin",
+      isAdmin: true,
+      isModerator: true,
+      isVerified: true,
+      accountStatus: "ACTIVE",
+      country: "SN",
+      language: "fr",
+      balanceCents: 0,
+    },
+  });
+  void admin;
+
+  await prisma.adminAction.deleteMany({});
+  await prisma.helpTicket.deleteMany({});
+  await prisma.videoHashtag.deleteMany({});
+  await prisma.hashtag.deleteMany({});
   await prisma.transaction.deleteMany({});
   await prisma.watchEvent.deleteMany({});
   await prisma.bookmark.deleteMany({});
@@ -183,10 +238,10 @@ async function main() {
   const authors = [demo, alice, bob, demo, alice];
   const sounds = [
     "Son original — @demo",
-    "Summer vibes — ClipTok Sounds",
-    "Piano émotion — ClipTok Sounds",
+    "Summer vibes — AfriVoix Sounds",
+    "Piano émotion — AfriVoix Sounds",
     "Son original — @demo",
-    "Lofi night — ClipTok Sounds",
+    "Lofi night — AfriVoix Sounds",
   ];
   for (let i = 0; i < SAMPLES.length; i++) {
     const s = SAMPLES[i];
@@ -211,8 +266,8 @@ async function main() {
       },
       {
         userId: demo.id,
-        url: "https://cliptok.local",
-        label: "ClipTok",
+        url: "https://afrivoix.local",
+        label: "AfriVoix",
         sortOrder: 1,
       },
       {
@@ -237,6 +292,26 @@ async function main() {
       console.log("  OK seed_map.jpg (copie story)");
     } catch {
       console.log("  (pas d'image commentaire démo)");
+    }
+  }
+
+
+  // Hashtags from captions
+  const allVideos = await prisma.video.findMany();
+  for (const v of allVideos) {
+    const re = /#([A-Za-z0-9_\u00C0-\u024F]{1,50})/g;
+    const names = new Set<string>();
+    let m;
+    while ((m = re.exec(v.caption)) !== null) names.add(m[1].toLowerCase());
+    for (const name of names) {
+      const tag = await prisma.hashtag.upsert({
+        where: { name },
+        create: { name },
+        update: {},
+      });
+      await prisma.videoHashtag.create({
+        data: { videoId: v.id, hashtagId: tag.id },
+      });
     }
   }
 
@@ -423,7 +498,7 @@ async function main() {
   }
 
   await seedThread(demo, alice, [
-    { senderId: alice.id, body: "Salut Démo ! Bienvenue sur ClipTok 👋", minutesAgo: 120 },
+    { senderId: alice.id, body: "Salut Démo ! Bienvenue sur AfriVoix 👋", minutesAgo: 120 },
     { senderId: demo.id, body: "Merci Alice ! Les vidéos sont top.", minutesAgo: 90 },
     { senderId: alice.id, body: "N'hésite pas à me follow back ✨", minutesAgo: 45 },
     { senderId: demo.id, body: "Déjà fait 😄", minutesAgo: 30, read: false },
@@ -473,10 +548,11 @@ async function main() {
 
   console.log("\nSeed terminé !");
   console.log("Comptes démo (mot de passe: demo1234):");
-  console.log("  - demo@cliptok.local / demo");
-  console.log("  - alice@cliptok.local / alice");
-  console.log("  - bob@cliptok.local / bob");
-  console.log("  - charlie@cliptok.local / charlie");
+  console.log("  - demo@afrivoix.local / demo");
+  console.log("  - alice@afrivoix.local / alice");
+  console.log("  - bob@afrivoix.local / bob");
+  console.log("  - charlie@afrivoix.local / charlie");
+  console.log("  - admin@afrivoix.local / admin (isAdmin)");
   console.log(`${SAMPLES.length} vidéos, commentaires filés, stories, follows + DMs créés.`);
   console.log("Portefeuille démo: demo=10,00 € · alice=5,00 € (crédits virtuels).");
 }

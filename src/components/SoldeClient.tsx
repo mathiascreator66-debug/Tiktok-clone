@@ -19,7 +19,7 @@ const TYPE_LABELS: Record<string, string> = {
   tip_sent: "Pourboire envoyé",
   tip_received: "Pourboire reçu",
   boost: "Boost vidéo",
-  subscription: "ClipTok Pro",
+  subscription: "AfriVoix Pro",
 };
 
 export default function SoldeClient({ username }: { username: string }) {

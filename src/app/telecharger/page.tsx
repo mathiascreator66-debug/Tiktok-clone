@@ -23,7 +23,7 @@ export default async function TelechargerPage({
         </Link>
         <h1 className="text-2xl font-bold mt-3">Créer</h1>
         <p className="text-white/50 text-sm mt-1">
-          Studio ClipTok · @{session.username} · jusqu’à {MAX_UPLOAD_LABEL}
+          Studio AfriVoix · @{session.username} · jusqu’à {MAX_UPLOAD_LABEL}
         </p>
         <div className="flex gap-2 mt-4 p-1 rounded-full bg-white/5">
           <Link

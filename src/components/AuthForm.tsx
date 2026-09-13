@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import BrandLogo from "./BrandLogo";
+import { COUNTRIES, LANG_OPTIONS } from "@/lib/countries";
 
 type Mode = "login" | "register";
 
@@ -25,6 +27,12 @@ export default function AuthForm({
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [country, setCountry] = useState("SN");
+  const [language, setLanguage] = useState("fr");
+  const [birthdate, setBirthdate] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState("+221");
+  const [phone, setPhone] = useState("");
+  const [acceptCgu, setAcceptCgu] = useState(false);
   const [error, setError] = useState(
     () => GOOGLE_ERRORS[searchParams.get("erreur") || ""] || ""
   );
@@ -39,7 +47,19 @@ export default function AuthForm({
       const body =
         mode === "login"
           ? { email, password }
-          : { email, username, password };
+          : {
+              email,
+              username,
+              password,
+              country,
+              language,
+              birthdate,
+              phoneE164: phone.trim()
+                ? `${phoneCountry}${phone.replace(/\D/g, "")}`
+                : undefined,
+              phoneCountry,
+              acceptCgu,
+            };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -60,11 +80,10 @@ export default function AuthForm({
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 bg-black">
-      <Link href="/" className="text-3xl font-extrabold mb-8">
-        <span className="text-[#fe2c55]">Clip</span>
-        <span className="text-white">Tok</span>
-      </Link>
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 py-10 bg-black">
+      <div className="mb-6 flex flex-col items-center">
+        <BrandLogo variant="full" priority href="/" className="mb-2" />
+      </div>
 
       <div className="w-full max-w-sm space-y-4 bg-white/5 border border-white/10 rounded-2xl p-6">
         <h1 className="text-xl font-bold text-center mb-2">
@@ -100,7 +119,7 @@ export default function AuthForm({
           <button
             type="button"
             disabled
-            title="Ajoutez GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et NEXT_PUBLIC_APP_URL dans .env"
+            title="Ajoutez GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et APP_URL dans .env"
             className="w-full flex items-center justify-center gap-2 bg-white/10 text-white/40 rounded-full py-2.5 font-semibold text-sm cursor-not-allowed"
           >
             Continuer avec Google
@@ -118,7 +137,7 @@ export default function AuthForm({
           <div className="flex-1 h-px bg-white/10" />
         </div>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="space-y-3">
           <div>
             <label className="block text-xs text-white/50 mb-1">Email</label>
             <input
@@ -126,27 +145,115 @@ export default function AuthForm({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#fe2c55]"
+              className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
               placeholder="vous@exemple.com"
             />
           </div>
 
           {mode === "register" && (
-            <div>
-              <label className="block text-xs text-white/50 mb-1">
-                Nom d&apos;utilisateur
+            <>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">
+                  Nom d&apos;utilisateur
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  minLength={3}
+                  pattern="[a-zA-Z0-9_]+"
+                  className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
+                  placeholder="votre_pseudo"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">Pays</label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  required
+                  className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code} className="bg-black">
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">Langue</label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
+                >
+                  {LANG_OPTIONS.map((l) => (
+                    <option key={l.code} value={l.code} className="bg-black">
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">
+                  Date de naissance (13 ans minimum)
+                </label>
+                <input
+                  type="date"
+                  value={birthdate}
+                  onChange={(e) => setBirthdate(e.target.value)}
+                  required
+                  className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">
+                  Téléphone (optionnel — SMS phase 2)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={phoneCountry}
+                    onChange={(e) => setPhoneCountry(e.target.value)}
+                    className="w-20 bg-white/10 rounded-lg px-2 py-2.5 text-sm outline-none"
+                    placeholder="+221"
+                  />
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="flex-1 bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
+                    placeholder="77 000 00 00"
+                  />
+                </div>
+              </div>
+              <label className="flex items-start gap-2 text-xs text-white/70 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptCgu}
+                  onChange={(e) => setAcceptCgu(e.target.checked)}
+                  required
+                  className="mt-0.5"
+                />
+                <span>
+                  J&apos;accepte les{" "}
+                  <Link href="/cgu" className="text-[#d4af37] underline" target="_blank">
+                    Conditions générales d&apos;utilisation
+                  </Link>{" "}
+                  et la{" "}
+                  <Link
+                    href="/confidentialite"
+                    className="text-[#d4af37] underline"
+                    target="_blank"
+                  >
+                    Politique de confidentialité
+                  </Link>
+                  .
+                </span>
               </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                minLength={3}
-                pattern="[a-zA-Z0-9_]+"
-                className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#fe2c55]"
-                placeholder="votre_pseudo"
-              />
-            </div>
+            </>
           )}
 
           <div>
@@ -159,8 +266,9 @@ export default function AuthForm({
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#fe2c55]"
+              className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
               placeholder="••••••••"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
           </div>
 
@@ -169,7 +277,7 @@ export default function AuthForm({
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#fe2c55] hover:bg-[#e0264c] disabled:opacity-50 rounded-full py-2.5 font-semibold transition"
+            className="w-full bg-[#d4af37] hover:bg-[#c4a030] text-black disabled:opacity-50 rounded-full py-2.5 font-semibold transition"
           >
             {loading
               ? "Chargement..."
@@ -183,20 +291,14 @@ export default function AuthForm({
           {mode === "login" ? (
             <>
               Pas encore de compte ?{" "}
-              <Link
-                href="/inscription"
-                className="text-[#25f4ee] hover:underline"
-              >
+              <Link href="/inscription" className="text-[#25f4ee] hover:underline">
                 S&apos;inscrire
               </Link>
             </>
           ) : (
             <>
               Déjà un compte ?{" "}
-              <Link
-                href="/connexion"
-                className="text-[#25f4ee] hover:underline"
-              >
+              <Link href="/connexion" className="text-[#25f4ee] hover:underline">
                 Se connecter
               </Link>
             </>

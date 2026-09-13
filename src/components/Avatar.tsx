@@ -40,7 +40,7 @@ export default function Avatar({
       <span
         className="absolute -bottom-0.5 -right-0.5 rounded-full bg-amber-400 text-black font-bold flex items-center justify-center border border-black/40 shadow"
         style={{ width: badge, height: badge, fontSize: badge * 0.45 }}
-        title="ClipTok Pro"
+        title="AfriVoix Pro"
         aria-label="Pro"
       >
         Pro

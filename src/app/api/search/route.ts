@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
     const session = await getSession();
     const term = q.replace(/^@/, "");
 
-    const [users, videos] = await Promise.all([
+    const tagName = term.replace(/^#/, "").toLowerCase();
+    const [users, videos, tagVideos] = await Promise.all([
       prisma.user.findMany({
         where: {
           OR: [
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest) {
           displayName: true,
           avatarUrl: true,
           bio: true,
+          isVerified: true,
           _count: { select: { followers: true, videos: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -54,7 +56,31 @@ export async function GET(req: NextRequest) {
           _count: { select: { likes: true, comments: true, bookmarks: true } },
         },
       }),
+      tagName
+        ? prisma.video.findMany({
+            where: {
+              hashtags: { some: { hashtag: { name: tagName } } },
+            },
+            take: 24,
+            orderBy: { createdAt: "desc" },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  displayName: true,
+                  avatarUrl: true,
+                },
+              },
+              _count: { select: { likes: true, comments: true, bookmarks: true } },
+            },
+          })
+        : Promise.resolve([]),
     ]);
+
+    const videoMap = new Map<string, (typeof videos)[number]>();
+    for (const v of [...tagVideos, ...videos]) videoMap.set(v.id, v);
+    const mergedVideos = Array.from(videoMap.values());
 
     return NextResponse.json({
       users: users.map((u) => ({
@@ -65,8 +91,10 @@ export async function GET(req: NextRequest) {
         bio: u.bio,
         followerCount: u._count.followers,
         videoCount: u._count.videos,
+        isVerified: u.isVerified,
       })),
-      videos: videos.map((v) => ({
+      hashtag: q.trim().startsWith('#') ? tagName : null,
+      videos: mergedVideos.map((v) => ({
         id: v.id,
         caption: v.caption,
         videoUrl: v.videoUrl,

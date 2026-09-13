@@ -18,11 +18,13 @@ type VideoWithRelations = {
     avatarUrl: string | null;
     isPro: boolean;
     proUntil: Date | null;
+    isVerified?: boolean;
   };
   likes: { id: string }[] | false;
   reposts: { id: string }[] | false;
   bookmarks: { id: string }[] | false;
   _count: { likes: number; comments: number; reposts: number; bookmarks: number };
+  hashtags?: { hashtag: { name: string } }[];
 };
 
 function mapVideo(
@@ -46,11 +48,13 @@ function mapVideo(
     isOwner: session?.id === v.userId,
     pinned: Boolean(v.pinnedAt),
     boostedUntil: v.boostedUntil ? v.boostedUntil.toISOString() : null,
+    hashtags: v.hashtags?.map((h) => h.hashtag.name) ?? [],
     user: {
       id: v.user.id,
       username: v.user.username,
       displayName: v.user.displayName,
       avatarUrl: v.user.avatarUrl,
+      isVerified: Boolean(v.user.isVerified),
       isPro: Boolean(
         v.user.isPro &&
           (!v.user.proUntil || v.user.proUntil.getTime() > Date.now())
@@ -69,8 +73,10 @@ const videoInclude = (session: SessionUser | null) => ({
       avatarUrl: true,
       isPro: true,
       proUntil: true,
+      isVerified: true,
     },
   },
+  hashtags: { include: { hashtag: { select: { name: true } } } },
   likes: session
     ? { where: { userId: session.id }, select: { id: true } }
     : (false as const),
@@ -92,9 +98,55 @@ async function hiddenVideoIds(session: SessionUser | null): Promise<string[]> {
   return rows.map((r) => r.videoId);
 }
 
+/**
+ * Engagement score for « Pour toi » (no ML):
+ *
+ *   score =
+ *     likes
+ *     + comments * 2
+ *     + bookmarks
+ *     + recentWatchBoost          // +15 if any watch in last 48h on same creator
+ *     + followAffinity             // +25 if viewer follows creator
+ *     + hashtagAffinity            // +8 per overlapping hashtag with recent watches (cap 40)
+ *     + paidBoostBonus             // +1e12 while boostedUntil > now (sorts first)
+ *     + recencyBonus               // max(0, 72 - ageHours)  // soft freshness
+ *
+ * Documented here so future waves can swap for real ranking without changing callers.
+ */
+function engagementScore(opts: {
+  likes: number;
+  comments: number;
+  bookmarks: number;
+  createdAt: Date;
+  boostedUntil: Date | null;
+  followsCreator: boolean;
+  recentWatchCreator: boolean;
+  hashtagOverlap: number;
+}): number {
+  const now = Date.now();
+  const ageHours = (now - opts.createdAt.getTime()) / 3_600_000;
+  const paidBoost =
+    opts.boostedUntil && opts.boostedUntil.getTime() > now ? 1_000_000_000_000 : 0;
+  const recentWatchBoost = opts.recentWatchCreator ? 15 : 0;
+  const followAffinity = opts.followsCreator ? 25 : 0;
+  const hashtagAffinity = Math.min(40, opts.hashtagOverlap * 8);
+  const recencyBonus = Math.max(0, 72 - ageHours);
+  return (
+    opts.likes +
+    opts.comments * 2 +
+    opts.bookmarks +
+    recentWatchBoost +
+    followAffinity +
+    hashtagAffinity +
+    paidBoost +
+    recencyBonus
+  );
+}
+
 async function buildMixedFeed(
   session: SessionUser | null,
-  userIds?: string[]
+  userIds?: string[],
+  rankByEngagement = false
 ): Promise<FeedVideo[]> {
   const hidden = await hiddenVideoIds(session);
   const videoWhere = {
@@ -111,6 +163,7 @@ async function buildMixedFeed(
       where: videoWhere,
       orderBy: { createdAt: "desc" },
       include: videoInclude(session),
+      take: rankByEngagement ? 200 : undefined,
     }),
     prisma.repost.findMany({
       where: repostWhere,
@@ -119,48 +172,123 @@ async function buildMixedFeed(
         user: { select: { id: true, username: true } },
         video: { include: videoInclude(session) },
       },
+      take: rankByEngagement ? 100 : undefined,
     }),
   ]);
 
-  type Item = { sortAt: number; feedKey: string; item: FeedVideo };
+  type Item = { sortAt: number; score: number; feedKey: string; item: FeedVideo };
+
+  let followingSet = new Set<string>();
+  const recentWatchCreators = new Set<string>();
+  const affinityTags = new Set<string>();
+
+  if (session && rankByEngagement) {
+    const [follows, watches] = await Promise.all([
+      prisma.follow.findMany({
+        where: { followerId: session.id },
+        select: { followingId: true },
+      }),
+      prisma.watchEvent.findMany({
+        where: {
+          userId: session.id,
+          watchedAt: { gte: new Date(Date.now() - 48 * 3600_000) },
+        },
+        select: {
+          video: {
+            select: {
+              userId: true,
+              hashtags: { include: { hashtag: { select: { name: true } } } },
+            },
+          },
+        },
+        take: 50,
+      }),
+    ]);
+    followingSet = new Set(follows.map((f) => f.followingId));
+    for (const w of watches) {
+      recentWatchCreators.add(w.video.userId);
+      for (const h of w.video.hashtags) affinityTags.add(h.hashtag.name);
+    }
+  }
 
   const items: Item[] = [
-    ...videos.map((v) => ({
-      sortAt: v.createdAt.getTime(),
-      feedKey: `v-${v.id}`,
-      item: mapVideo(v as VideoWithRelations, session),
-    })),
-    ...reposts.map((r) => ({
-      sortAt: r.createdAt.getTime(),
-      feedKey: `r-${r.id}`,
-      item: mapVideo(r.video as VideoWithRelations, session, {
+    ...videos.map((v) => {
+      const mapped = mapVideo(v as VideoWithRelations, session);
+      const tags = (v as VideoWithRelations).hashtags?.map((h) => h.hashtag.name) ?? [];
+      const overlap = tags.filter((t) => affinityTags.has(t)).length;
+      const score = rankByEngagement
+        ? engagementScore({
+            likes: v._count.likes,
+            comments: v._count.comments,
+            bookmarks: v._count.bookmarks,
+            createdAt: v.createdAt,
+            boostedUntil: v.boostedUntil,
+            followsCreator: followingSet.has(v.userId),
+            recentWatchCreator: recentWatchCreators.has(v.userId),
+            hashtagOverlap: overlap,
+          })
+        : v.createdAt.getTime();
+      return {
+        sortAt: v.createdAt.getTime(),
+        score,
+        feedKey: `v-${v.id}`,
+        item: mapped,
+      };
+    }),
+    ...reposts.map((r) => {
+      const mapped = mapVideo(r.video as VideoWithRelations, session, {
         id: r.id,
         createdAt: r.createdAt.toISOString(),
         user: r.user,
-      }),
-    })),
+      });
+      const vv = r.video as VideoWithRelations;
+      const tags = vv.hashtags?.map((h) => h.hashtag.name) ?? [];
+      const overlap = tags.filter((t) => affinityTags.has(t)).length;
+      const score = rankByEngagement
+        ? engagementScore({
+            likes: vv._count.likes,
+            comments: vv._count.comments,
+            bookmarks: vv._count.bookmarks,
+            createdAt: r.createdAt,
+            boostedUntil: vv.boostedUntil,
+            followsCreator: followingSet.has(vv.userId),
+            recentWatchCreator: recentWatchCreators.has(vv.userId),
+            hashtagOverlap: overlap,
+          }) * 0.9
+        : r.createdAt.getTime();
+      return {
+        sortAt: r.createdAt.getTime(),
+        score,
+        feedKey: `r-${r.id}`,
+        item: mapped,
+      };
+    }),
   ];
 
-  const now = Date.now();
-  function boostScore(item: FeedVideo): number {
-    if (!item.boostedUntil) return 0;
-    const t = new Date(item.boostedUntil).getTime();
-    return t > now ? t : 0;
+  if (rankByEngagement) {
+    items.sort((a, b) => b.score - a.score || b.sortAt - a.sortAt);
+  } else {
+    const now = Date.now();
+    const boostScore = (item: FeedVideo): number => {
+      if (!item.boostedUntil) return 0;
+      const t = new Date(item.boostedUntil).getTime();
+      return t > now ? t : 0;
+    };
+    items.sort((a, b) => {
+      const ba = boostScore(a.item);
+      const bb = boostScore(b.item);
+      if (ba !== bb) return bb - ba;
+      return b.sortAt - a.sortAt;
+    });
   }
-  items.sort((a, b) => {
-    const ba = boostScore(a.item);
-    const bb = boostScore(b.item);
-    if (ba !== bb) return bb - ba;
-    return b.sortAt - a.sortAt;
-  });
   return items.map((i) => i.item);
 }
 
-/** Fil mélangé : vidéos originales + republications, triés par date. */
+/** Fil « Pour toi » : classement par score d'engagement (voir engagementScore). */
 export async function getMixedFeed(
   session: SessionUser | null
 ): Promise<FeedVideo[]> {
-  return buildMixedFeed(session);
+  return buildMixedFeed(session, undefined, true);
 }
 
 /**
@@ -176,5 +304,5 @@ export async function getFollowingFeed(
   });
   const ids = follows.map((f) => f.followingId);
   if (ids.length === 0) return [];
-  return buildMixedFeed(session, ids);
+  return buildMixedFeed(session, ids, false);
 }

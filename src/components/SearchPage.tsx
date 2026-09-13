@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Heart, Search, Users } from "lucide-react";
 import Avatar from "./Avatar";
@@ -26,7 +27,8 @@ type VideoHit = {
 };
 
 export default function SearchPage() {
-  const [q, setQ] = useState("");
+  const sp = useSearchParams();
+  const [q, setQ] = useState(() => sp.get("q") || "");
   const [users, setUsers] = useState<UserHit[]>([]);
   const [videos, setVideos] = useState<VideoHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,7 +75,7 @@ export default function SearchPage() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Rechercher des comptes et des vidéos"
+            placeholder="Comptes, vidéos, #hashtags"
             autoFocus
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-white/35"
           />

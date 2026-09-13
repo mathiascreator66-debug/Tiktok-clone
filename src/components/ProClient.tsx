@@ -68,7 +68,7 @@ export default function ProClient({ username }: { username: string }) {
       setOkMsg(
         useTrial
           ? "Essai Pro activé 7 jours (démo)"
-          : "ClipTok Pro activé 7 jours (démo — crédits virtuels)"
+          : "AfriVoix Pro activé 7 jours (démo — crédits virtuels)"
       );
       await load();
     } catch {
@@ -88,7 +88,7 @@ export default function ProClient({ username }: { username: string }) {
         >
           <ArrowLeft size={22} />
         </Link>
-        <h1 className="font-bold text-lg flex-1">ClipTok Pro</h1>
+        <h1 className="font-bold text-lg flex-1">AfriVoix Pro</h1>
         <Link href="/solde" className="text-xs font-semibold text-white/60">
           Solde
         </Link>
@@ -97,7 +97,7 @@ export default function ProClient({ username }: { username: string }) {
       <div className="rounded-2xl bg-gradient-to-br from-amber-500/25 via-[#fe2c55]/20 to-[#25f4ee]/25 border border-white/10 p-5 mb-5">
         <div className="flex items-center gap-2 mb-2">
           <Sparkles className="text-amber-300" size={22} />
-          <h2 className="text-xl font-bold">ClipTok Pro</h2>
+          <h2 className="text-xl font-bold">AfriVoix Pro</h2>
         </div>
         {loading && !state ? (
           <div className="flex items-center gap-2 text-white/60">

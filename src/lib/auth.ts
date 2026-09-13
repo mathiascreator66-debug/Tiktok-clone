@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 
-const COOKIE_NAME = "tiktok_session";
+const COOKIE_NAME = "afrivoix_session";
 const SESSION_DAYS = 7;
 
 function getSecret() {
@@ -93,8 +93,81 @@ export async function getCurrentUser() {
       avatarUrl: true,
       bio: true,
       createdAt: true,
+      isAdmin: true,
+      isModerator: true,
+      isVerified: true,
+      accountStatus: true,
+      country: true,
+      language: true,
+      birthdate: true,
+      phoneE164: true,
+      phoneCountry: true,
     },
   });
+}
+
+/** Load full auth flags; returns null if missing or not ACTIVE */
+export async function getActiveUser(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      avatarUrl: true,
+      accountStatus: true,
+      isAdmin: true,
+      isModerator: true,
+      isVerified: true,
+    },
+  });
+  if (!user) return null;
+  if (user.accountStatus !== "ACTIVE") return null;
+  return user;
+}
+
+export async function requireAdmin() {
+  const session = await getSession();
+  if (!session) throw new Error("UNAUTHORIZED");
+  const user = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      isAdmin: true,
+      isModerator: true,
+      accountStatus: true,
+    },
+  });
+  if (!user || user.accountStatus !== "ACTIVE" || !user.isAdmin) {
+    throw new Error("FORBIDDEN");
+  }
+  return user;
+}
+
+export async function requireModerator() {
+  const session = await getSession();
+  if (!session) throw new Error("UNAUTHORIZED");
+  const user = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      isAdmin: true,
+      isModerator: true,
+      accountStatus: true,
+    },
+  });
+  if (
+    !user ||
+    user.accountStatus !== "ACTIVE" ||
+    (!user.isAdmin && !user.isModerator)
+  ) {
+    throw new Error("FORBIDDEN");
+  }
+  return user;
 }
 
 export function isGoogleAuthConfigured() {
@@ -110,8 +183,12 @@ export function getAppUrl() {
     process.env.APP_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     "http://localhost:3000"
-  ).replace(
-    /\/$/,
-    ""
-  );
+  ).replace(/\/$/, "");
+}
+
+export function ageFromBirthdate(birthdate: Date, now = new Date()): number {
+  let age = now.getFullYear() - birthdate.getFullYear();
+  const m = now.getMonth() - birthdate.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birthdate.getDate())) age -= 1;
+  return age;
 }

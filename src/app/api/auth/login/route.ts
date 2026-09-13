@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession, verifyPassword } from "@/lib/auth";
+import { authRateLimit } from "@/lib/rate-limit";
+import { safeError } from "@/lib/safe-log";
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = authRateLimit(req, "login");
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${limited.retryAfterSec}s.` },
+        { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } }
+      );
+    }
+
     const body = await req.json();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
@@ -34,6 +44,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (user.accountStatus === "SUSPENDED") {
+      return NextResponse.json(
+        { error: "Compte suspendu. Contactez le support AfriVoix." },
+        { status: 403 }
+      );
+    }
+    if (user.accountStatus === "BANNED") {
+      return NextResponse.json(
+        { error: "Compte banni. Connexion impossible." },
+        { status: 403 }
+      );
+    }
+    if (user.accountStatus !== "ACTIVE") {
+      return NextResponse.json(
+        { error: "Compte non actif." },
+        { status: 403 }
+      );
+    }
+
     await createSession({
       id: user.id,
       email: user.email,
@@ -52,7 +81,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e) {
-    console.error(e);
+    safeError(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }

@@ -20,6 +20,7 @@ import {
 import Avatar from "./Avatar";
 import type { CommentItem } from "@/lib/types";
 import { formatRelativeFr } from "@/lib/time";
+import { LinkifiedText } from "@/lib/linkify";
 import Link from "next/link";
 
 type Props = {
@@ -390,7 +391,7 @@ export default function CommentPanel({
                   </span>
                 </div>
                 <p className="text-sm text-white break-words mt-0.5 whitespace-pre-wrap">
-                  {c.content.trim()}
+                  <LinkifiedText text={c.content.trim()} />
                 </p>
                 {c.imageUrl && (
                   // eslint-disable-next-line @next/next/no-img-element

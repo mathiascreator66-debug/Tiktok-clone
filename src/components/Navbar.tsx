@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Users, MessageCircle, User, LogOut, LogIn, Search } from "lucide-react";
+import BrandLogo from "./BrandLogo";
+import { useI18n } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 
 type Props = {
   user: { username: string } | null;
   initialUnread?: number;
+  isStaff?: boolean;
 };
 
 function Badge({ count }: { count: number }) {
@@ -20,7 +23,8 @@ function Badge({ count }: { count: number }) {
   );
 }
 
-export default function Navbar({ user, initialUnread = 0 }: Props) {
+export default function Navbar({ user, initialUnread = 0, isStaff = false }: Props) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const [unread, setUnread] = useState(initialUnread);
@@ -76,16 +80,16 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
     pathname.startsWith("/profil") ||
     pathname.startsWith("/parametres") ||
     pathname.startsWith("/historique") ||
-    pathname.startsWith("/activite");
+    pathname.startsWith("/activite") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/aide") ||
+    pathname.startsWith("/a-propos");
 
   return (
     <>
       {/* Top bar desktop */}
       <header className="hidden md:flex fixed top-0 inset-x-0 z-50 h-14 items-center justify-between px-6 bg-black/80 backdrop-blur border-b border-white/10">
-        <Link href="/" className="text-xl font-extrabold tracking-tight">
-          <span className="text-[#fe2c55]">Clip</span>
-          <span className="text-white">Tok</span>
-        </Link>
+        <BrandLogo variant="wordmark" size={32} />
         <nav className="flex items-center gap-6 text-sm">
           <Link
             href="/"
@@ -97,7 +101,7 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
             href="/recherche"
             className={`hover:text-[#fe2c55] flex items-center gap-1 ${isSearch ? "text-[#fe2c55]" : "text-white/80"}`}
           >
-            <Search size={14} /> Recherche
+            <Search size={14} /> {t("search")}
           </Link>
           {user ? (
             <>
@@ -105,19 +109,19 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
                 href="/amis"
                 className={`hover:text-[#fe2c55] ${isAmis ? "text-[#fe2c55]" : "text-white/80"}`}
               >
-                Amis
+                {t("friends")}
               </Link>
               <Link
                 href="/telecharger"
                 className={`hover:text-[#fe2c55] ${isUpload ? "text-[#fe2c55]" : "text-white/80"}`}
               >
-                Publier
+                {t("publish")}
               </Link>
               <Link
                 href="/messages"
                 className={`relative hover:text-[#fe2c55] ${isMessages ? "text-[#fe2c55]" : "text-white/80"}`}
               >
-                Messages
+                {t("messages")}
                 {unread > 0 && (
                   <span className="ml-1 inline-flex min-w-[18px] h-[18px] px-1 rounded-full bg-[#fe2c55] text-[10px] font-bold items-center justify-center">
                     {unread > 99 ? "99+" : unread}
@@ -130,11 +134,16 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
               >
                 @{user.username}
               </Link>
+              {isStaff && (
+                <Link href="/admin" className="hover:text-[#d4af37] text-white/80">
+                  {t("admin")}
+                </Link>
+              )}
               <button
                 onClick={logout}
                 className="flex items-center gap-1 text-white/60 hover:text-white"
               >
-                <LogOut size={16} /> Déconnexion
+                <LogOut size={16} /> {t("logout")}
               </button>
             </>
           ) : (
@@ -142,7 +151,7 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
               href="/connexion"
               className="bg-[#fe2c55] px-4 py-1.5 rounded-full font-semibold"
             >
-              Connexion
+              {t("login")}
             </Link>
           )}
         </nav>
@@ -153,7 +162,7 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 h-14 flex items-center justify-around bg-black/95 border-t border-white/10 pb-[env(safe-area-inset-bottom)]">
           <Link href="/" className="flex flex-col items-center gap-0.5 text-[10px] w-14">
             <Home size={22} className={isHome ? "text-white" : "text-white/50"} strokeWidth={isHome ? 2.5 : 2} />
-            <span className={isHome ? "text-white font-semibold" : "text-white/50"}>Accueil</span>
+            <span className={isHome ? "text-white font-semibold" : "text-white/50"}>{t("home")}</span>
           </Link>
 
           <Link
@@ -161,7 +170,7 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
             className="relative flex flex-col items-center gap-0.5 text-[10px] w-14"
           >
             <Users size={22} className={isAmis ? "text-white" : "text-white/50"} strokeWidth={isAmis ? 2.5 : 2} />
-            <span className={isAmis ? "text-white font-semibold" : "text-white/50"}>Amis</span>
+            <span className={isAmis ? "text-white font-semibold" : "text-white/50"}>{t("friends")}</span>
           </Link>
 
           <Link
@@ -194,7 +203,7 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
               <Badge count={unread} />
             </span>
             <span className={isMessages ? "text-white font-semibold" : "text-white/50"}>
-              Messages
+              {t("messages")}
             </span>
           </Link>
 
@@ -204,7 +213,7 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
               className="flex flex-col items-center gap-0.5 text-[10px] w-14"
             >
               <User size={22} className={isProfil ? "text-white" : "text-white/50"} strokeWidth={isProfil ? 2.5 : 2} />
-              <span className={isProfil ? "text-white font-semibold" : "text-white/50"}>Profil</span>
+              <span className={isProfil ? "text-white font-semibold" : "text-white/50"}>{t("profile")}</span>
             </Link>
           ) : (
             <Link
@@ -212,7 +221,7 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
               className="flex flex-col items-center gap-0.5 text-[10px] w-14"
             >
               <LogIn size={22} className="text-white/50" />
-              <span className="text-white/50">Connexion</span>
+              <span className="text-white/50">{t("login")}</span>
             </Link>
           )}
         </nav>

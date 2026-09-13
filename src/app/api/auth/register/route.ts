@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createSession, hashPassword } from "@/lib/auth";
+import { ageFromBirthdate, createSession, hashPassword } from "@/lib/auth";
+import { authRateLimit } from "@/lib/rate-limit";
+import { safeError } from "@/lib/safe-log";
+import { MIN_AGE } from "@/lib/limits";
+import { COUNTRIES } from "@/lib/countries";
+
+const LANGS = new Set(["fr", "en", "zh"]);
+const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = authRateLimit(req, "register");
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${limited.retryAfterSec}s.` },
+        { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } }
+      );
+    }
+
     const body = await req.json();
     const email = String(body.email || "").trim().toLowerCase();
     const username = String(body.username || "")
@@ -11,17 +26,63 @@ export async function POST(req: NextRequest) {
       .toLowerCase()
       .replace(/[^a-z0-9_]/g, "");
     const password = String(body.password || "");
+    const country = String(body.country || "").trim().toUpperCase();
+    const language = String(body.language || "fr").trim().toLowerCase();
+    const birthdateRaw = String(body.birthdate || "").trim();
+    const acceptCgu = Boolean(body.acceptCgu);
+    const phoneCountry = body.phoneCountry
+      ? String(body.phoneCountry).trim().slice(0, 8)
+      : null;
+    const phoneE164 = body.phoneE164
+      ? String(body.phoneE164).replace(/[^\d+]/g, "").slice(0, 20)
+      : null;
 
     if (!email || !username || password.length < 6) {
       return NextResponse.json(
-        { error: "Email, nom d'utilisateur et mot de passe (6+ caractères) requis." },
+        {
+          error:
+            "Email, nom d'utilisateur et mot de passe (6+ caractères) requis.",
+        },
         { status: 400 }
       );
     }
-
     if (username.length < 3) {
       return NextResponse.json(
         { error: "Le nom d'utilisateur doit contenir au moins 3 caractères." },
+        { status: 400 }
+      );
+    }
+    if (!acceptCgu) {
+      return NextResponse.json(
+        { error: "Vous devez accepter les CGU pour vous inscrire." },
+        { status: 400 }
+      );
+    }
+    if (!country || !COUNTRY_CODES.has(country)) {
+      return NextResponse.json({ error: "Pays invalide." }, { status: 400 });
+    }
+    if (!LANGS.has(language)) {
+      return NextResponse.json(
+        { error: "Langue invalide (fr, en ou zh)." },
+        { status: 400 }
+      );
+    }
+    if (!birthdateRaw) {
+      return NextResponse.json(
+        { error: "Date de naissance requise (13 ans minimum)." },
+        { status: 400 }
+      );
+    }
+    const birthdate = new Date(birthdateRaw);
+    if (Number.isNaN(birthdate.getTime())) {
+      return NextResponse.json(
+        { error: "Date de naissance invalide." },
+        { status: 400 }
+      );
+    }
+    if (ageFromBirthdate(birthdate) < MIN_AGE) {
+      return NextResponse.json(
+        { error: `Vous devez avoir au moins ${MIN_AGE} ans.` },
         { status: 400 }
       );
     }
@@ -38,7 +99,17 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hashPassword(password);
     const user = await prisma.user.create({
-      data: { email, username, passwordHash },
+      data: {
+        email,
+        username,
+        passwordHash,
+        country,
+        language,
+        birthdate,
+        phoneE164: phoneE164 || null,
+        phoneCountry: phoneCountry || null,
+        accountStatus: "ACTIVE",
+      },
     });
 
     await createSession({
@@ -57,7 +128,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e) {
-    console.error(e);
+    safeError(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }

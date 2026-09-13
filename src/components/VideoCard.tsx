@@ -23,6 +23,7 @@ import type { FeedVideo } from "@/lib/types";
 import { soundLabel } from "@/lib/sounds";
 import { formatCount } from "@/lib/format";
 import type { PlaybackRate } from "@/lib/limits";
+import { LinkifiedText } from "@/lib/linkify";
 
 type Props = {
   video: FeedVideo;
@@ -312,7 +313,6 @@ export default function VideoCard({
 
   if (hidden) return null;
 
-  const displayName = video.user.displayName || video.user.username;
 
   return (
     <div className="relative h-[100dvh] w-full snap-start snap-always flex items-center justify-center bg-black overflow-hidden">
@@ -340,7 +340,7 @@ export default function VideoCard({
             size={88}
             className="absolute fill-[#fe2c55] text-[#fe2c55] drop-shadow-2xl scale-100 opacity-90"
             style={{
-              animation: "cliptok-heart-pop 0.7s ease-out forwards",
+              animation: "afrivoix-heart-pop 0.7s ease-out forwards",
             }}
           />
         </div>
@@ -498,10 +498,13 @@ export default function VideoCard({
           className="font-bold text-base pointer-events-auto hover:underline"
         >
           @{video.user.username}
+          {video.user.isVerified && (
+            <span className="inline-block ml-1 text-[#25f4ee] text-xs" title="Vérifié">✓</span>
+          )}
           {video.user.displayName &&
             video.user.displayName !== video.user.username && (
               <span className="font-normal text-white/50 text-sm ml-1.5">
-                {displayName}
+                {video.user.displayName}
               </span>
             )}
         </Link>
@@ -510,7 +513,7 @@ export default function VideoCard({
             Boosté
           </span>
         )}
-        <p className="text-sm mt-1 text-white/90 line-clamp-3">{caption}</p>
+        <p className="text-sm mt-1 text-white/90 line-clamp-3 pointer-events-auto"><LinkifiedText text={caption} /></p>
         <p className="mt-2 flex items-center gap-1.5 text-xs text-white/70 truncate">
           <Music2 size={12} className="shrink-0 opacity-80" />
           <span className="truncate">
@@ -566,7 +569,7 @@ export default function VideoCard({
 
       <style
         dangerouslySetInnerHTML={{
-          __html: `@keyframes cliptok-heart-pop{0%{transform:scale(.3);opacity:0}40%{transform:scale(1.15);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(1.4);opacity:0}}`,
+          __html: `@keyframes afrivoix-heart-pop{0%{transform:scale(.3);opacity:0}40%{transform:scale(1.15);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(1.4);opacity:0}}`,
         }}
       />
     </div>
