@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import ProfileHeader from "@/components/ProfileHeader";
 import ProfileTabs from "@/components/ProfileTabs";
+import { isProActive } from "@/lib/wallet-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,7 @@ export default async function ProfilPage({
         followingCount={user._count.following}
         followerCount={user._count.followers}
         likeCount={likeAgg}
+        isPro={isProActive(user)}
         hasActiveStories={activeStoryCount > 0}
         links={user.profileLinks}
       />

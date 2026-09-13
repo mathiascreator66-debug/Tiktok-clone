@@ -90,15 +90,17 @@ async function main() {
   const demo = await prisma.user.upsert({
     where: { email: "demo@cliptok.local" },
     update: {
-      bio: "Compte démo ClipTok 🎬 — fil, stories, DMs et maintenant favoris, sons et historique. Bio jusqu’à 250 caractères.",
+      bio: "Compte démo ClipTok 🎬 — fil, stories, DMs, solde démo et monétisation. Bio jusqu’à 250 caractères.",
       displayName: "Démo",
+      balanceCents: 1000,
     },
     create: {
       email: "demo@cliptok.local",
       username: "demo",
       passwordHash,
-      bio: "Compte démo ClipTok 🎬 — fil, stories, DMs et maintenant favoris, sons et historique. Bio jusqu’à 250 caractères.",
+      bio: "Compte démo ClipTok 🎬 — fil, stories, DMs, solde démo et monétisation. Bio jusqu’à 250 caractères.",
       displayName: "Démo",
+      balanceCents: 1000,
     },
   });
 
@@ -107,6 +109,7 @@ async function main() {
     update: {
       bio: "Créatrice de contenus · voyage & lifestyle. Liens dans la bio ✨",
       displayName: "Alice",
+      balanceCents: 500,
     },
     create: {
       email: "alice@cliptok.local",
@@ -114,6 +117,7 @@ async function main() {
       passwordHash,
       bio: "Créatrice de contenus · voyage & lifestyle. Liens dans la bio ✨",
       displayName: "Alice",
+      balanceCents: 500,
     },
   });
 
@@ -147,6 +151,7 @@ async function main() {
     },
   });
 
+  await prisma.transaction.deleteMany({});
   await prisma.watchEvent.deleteMany({});
   await prisma.bookmark.deleteMany({});
   await prisma.notInterested.deleteMany({});
@@ -440,6 +445,32 @@ async function main() {
     },
   ]);
 
+  // Portefeuille démo : solde déjà sur user.demo (1000 cents) + historique
+  await prisma.transaction.create({
+    data: {
+      userId: demo.id,
+      type: "credit",
+      amountCents: 1000,
+      meta: JSON.stringify({
+        demo: true,
+        note: "Solde initial démo — crédits virtuels",
+        source: "seed",
+      }),
+    },
+  });
+  await prisma.transaction.create({
+    data: {
+      userId: alice.id,
+      type: "credit",
+      amountCents: 500,
+      meta: JSON.stringify({
+        demo: true,
+        note: "Solde initial démo — crédits virtuels",
+        source: "seed",
+      }),
+    },
+  });
+
   console.log("\nSeed terminé !");
   console.log("Comptes démo (mot de passe: demo1234):");
   console.log("  - demo@cliptok.local / demo");
@@ -447,6 +478,7 @@ async function main() {
   console.log("  - bob@cliptok.local / bob");
   console.log("  - charlie@cliptok.local / charlie");
   console.log(`${SAMPLES.length} vidéos, commentaires filés, stories, follows + DMs créés.`);
+  console.log("Portefeuille démo: demo=10,00 € · alice=5,00 € (crédits virtuels).");
 }
 
 main()

@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Pin, PinOff, Trash2, Rocket } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type Props = {
   videoId: string;
   caption: string;
   pinned?: boolean;
+  boostedUntil?: string | null;
   onCaptionUpdated?: (caption: string) => void;
   onPinned?: (pinned: boolean) => void;
+  onBoosted?: (boostedUntil: string) => void;
   onDeleted?: () => void;
   /** Compact icon for feed */
   variant?: "feed" | "grid";
@@ -19,8 +21,10 @@ export default function VideoOwnerMenu({
   videoId,
   caption,
   pinned = false,
+  boostedUntil = null,
   onCaptionUpdated,
   onPinned,
+  onBoosted,
   onDeleted,
   variant = "feed",
 }: Props) {
@@ -31,6 +35,7 @@ export default function VideoOwnerMenu({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isPinned, setIsPinned] = useState(pinned);
+  const [boostUntil, setBoostUntil] = useState<string | null>(boostedUntil);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -111,6 +116,37 @@ export default function VideoOwnerMenu({
     }
   }
 
+
+  async function boostVideo() {
+    if (
+      !confirm(
+        "Booster cette vidéo 24 h pour 2 € (démo — crédits virtuels) ?"
+      )
+    )
+      return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/videos/${videoId}/boost`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Erreur");
+        return;
+      }
+      setBoostUntil(data.boostedUntil);
+      onBoosted?.(data.boostedUntil);
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError("Erreur réseau.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -156,6 +192,21 @@ export default function VideoOwnerMenu({
               >
                 {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
                 {isPinned ? "Désépingler" : "Épingler"}
+              </button>
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/10 text-left"
+                onClick={boostVideo}
+                disabled={loading}
+              >
+                <Rocket size={16} className="text-amber-300" />
+                Booster (2 € démo)
+                {boostUntil &&
+                  new Date(boostUntil).getTime() > Date.now() && (
+                    <span className="text-[10px] text-amber-300/80 ml-auto">
+                      actif
+                    </span>
+                  )}
               </button>
               {error && !editing && (
                 <p className="px-3 py-1.5 text-[11px] text-[#fe2c55]">{error}</p>

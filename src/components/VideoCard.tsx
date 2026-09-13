@@ -11,12 +11,14 @@ import {
   VolumeX,
   Music2,
   Bookmark,
+  Gift,
 } from "lucide-react";
 import Avatar from "./Avatar";
 import CommentPanel from "./CommentPanel";
 import Toast from "./Toast";
 import VideoOwnerMenu from "./VideoOwnerMenu";
 import ShareSheet from "./ShareSheet";
+import TipSheet from "./TipSheet";
 import type { FeedVideo } from "@/lib/types";
 import { soundLabel } from "@/lib/sounds";
 import { formatCount } from "@/lib/format";
@@ -52,6 +54,8 @@ export default function VideoCard({
   const [caption, setCaption] = useState(video.caption);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [tipOpen, setTipOpen] = useState(false);
+  const [boostedUntil, setBoostedUntil] = useState(video.boostedUntil);
   const [muted, setMuted] = useState(true);
   const [liking, setLiking] = useState(false);
   const [reposting, setReposting] = useState(false);
@@ -69,14 +73,14 @@ export default function VideoCard({
     const el = videoRef.current;
     if (!el) return;
     el.playbackRate = playbackRate;
-    if (isActive && !commentsOpen && !shareOpen) {
+    if (isActive && !commentsOpen && !shareOpen && !tipOpen) {
       el.currentTime = 0;
       const play = el.play();
       if (play) play.catch(() => {});
     } else if (!isActive) {
       el.pause();
     }
-  }, [isActive, commentsOpen, shareOpen, playbackRate]);
+  }, [isActive, commentsOpen, shareOpen, tipOpen, playbackRate]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -348,6 +352,7 @@ export default function VideoCard({
             username={video.user.username}
             avatarUrl={video.user.avatarUrl}
             size={48}
+            isPro={Boolean(video.user.isPro)}
           />
         </Link>
 
@@ -422,6 +427,28 @@ export default function VideoCard({
           </span>
         </button>
 
+
+        {!video.isOwner && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isLoggedIn) {
+                window.location.href = "/connexion";
+                return;
+              }
+              setTipOpen(true);
+            }}
+            className="flex flex-col items-center gap-1 group"
+            aria-label="Offrir"
+          >
+            <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur flex items-center justify-center group-active:scale-90 transition">
+              <Gift size={26} className="text-[#fe2c55]" />
+            </div>
+            <span className="text-xs font-semibold">Offrir</span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={(e) => {
@@ -442,7 +469,9 @@ export default function VideoCard({
             videoId={video.id}
             caption={caption}
             pinned={video.pinned}
+            boostedUntil={boostedUntil}
             onCaptionUpdated={setCaption}
+            onBoosted={setBoostedUntil}
             onDeleted={() => {
               setHidden(true);
               onDeleted?.();
@@ -476,6 +505,11 @@ export default function VideoCard({
               </span>
             )}
         </Link>
+        {boostedUntil && new Date(boostedUntil).getTime() > Date.now() && (
+          <span className="inline-block mb-1 text-[10px] font-semibold uppercase tracking-wide bg-amber-400/90 text-black px-1.5 py-0.5 rounded pointer-events-auto">
+            Boosté
+          </span>
+        )}
         <p className="text-sm mt-1 text-white/90 line-clamp-3">{caption}</p>
         <p className="mt-2 flex items-center gap-1.5 text-xs text-white/70 truncate">
           <Music2 size={12} className="shrink-0 opacity-80" />
@@ -517,6 +551,15 @@ export default function VideoCard({
         onNotInterested={hideVideo}
         onReport={reportVideo}
         onPlaybackRate={setPlaybackRate}
+      />
+
+      <TipSheet
+        open={tipOpen}
+        onClose={() => setTipOpen(false)}
+        toUsername={video.user.username}
+        videoId={video.id}
+        isLoggedIn={isLoggedIn}
+        onTipped={() => setToast("Pourboire envoyé (démo)")}
       />
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

@@ -12,6 +12,9 @@ import {
   ChevronRight,
   Database,
   History,
+  Wallet,
+  Rocket,
+  Sparkles,
 } from "lucide-react";
 
 type Props = {
@@ -84,6 +87,27 @@ export default function SettingsDrawer({ open, onClose }: Props) {
             />
           </Section>
 
+
+          <Section title="Monétisation">
+            <LinkItem
+              href="/solde"
+              onClick={onClose}
+              icon={<Wallet size={20} />}
+              label="Solde"
+            />
+            <LinkItem
+              href="/pro"
+              onClick={onClose}
+              icon={<Sparkles size={20} />}
+              label="ClipTok Pro"
+            />
+            <LinkItem
+              href="/pro#promouvoir"
+              onClick={onClose}
+              icon={<Rocket size={20} />}
+              label="Promouvoir"
+            />
+          </Section>
           <Section title="Création">
             <LinkItem
               href="/telecharger"

@@ -9,6 +9,9 @@ import {
   Activity,
   Download,
   History,
+  Wallet,
+  Sparkles,
+  Rocket,
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 
@@ -54,6 +57,24 @@ export default async function ParametresPage() {
         />
       </Section>
 
+
+      <Section title="Monétisation">
+        <LinkItem
+          href="/solde"
+          icon={<Wallet size={20} />}
+          label="Solde"
+        />
+        <LinkItem
+          href="/pro"
+          icon={<Sparkles size={20} />}
+          label="ClipTok Pro"
+        />
+        <LinkItem
+          href="/pro#promouvoir"
+          icon={<Rocket size={20} />}
+          label="Promouvoir une vidéo"
+        />
+      </Section>
       <Section title="Compte">
         <LinkItem
           href="/parametres/compte"

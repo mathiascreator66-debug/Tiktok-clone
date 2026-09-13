@@ -16,6 +16,12 @@ model User {
   avatarUrl     String?
   bio           String?
   googleId      String?         @unique
+  /// Solde portefeuille en centimes (crédits virtuels démo)
+  balanceCents  Int             @default(0)
+  isPro         Boolean         @default(false)
+  proUntil      DateTime?
+  /// Essai Pro gratuit déjà utilisé (une fois)
+  proTrialUsed  Boolean         @default(false)
   createdAt     DateTime        @default(now())
   videos        Video[]
   likes         Like[]
@@ -34,6 +40,7 @@ model User {
   reports       Report[]
   profileLinks  ProfileLink[]
   watchEvents   WatchEvent[]
+  transactions  Transaction[]
 }
 
 model Video {
@@ -42,6 +49,8 @@ model Video {
   videoUrl      String
   soundName     String?
   pinnedAt      DateTime?
+  /// Boost actif jusqu'à cette date (visibilité feed Pour toi)
+  boostedUntil  DateTime?
   createdAt     DateTime        @default(now())
   userId        String
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -231,4 +240,19 @@ model WatchEvent {
 
   @@index([userId, watchedAt])
   @@index([videoId])
+}
+
+/// Historique portefeuille (crédits virtuels — démo, pas d'argent réel)
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  /// credit | debit | tip_sent | tip_received | boost | subscription
+  type        String
+  amountCents Int
+  /// JSON optionnel : { note, feeCents, counterpartyId, videoId, demo: true, ... }
+  meta        String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

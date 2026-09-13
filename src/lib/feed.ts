@@ -8,6 +8,7 @@ type VideoWithRelations = {
   videoUrl: string;
   soundName: string | null;
   pinnedAt: Date | null;
+  boostedUntil: Date | null;
   createdAt: Date;
   userId: string;
   user: {
@@ -15,6 +16,8 @@ type VideoWithRelations = {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
+    isPro: boolean;
+    proUntil: Date | null;
   };
   likes: { id: string }[] | false;
   reposts: { id: string }[] | false;
@@ -42,7 +45,17 @@ function mapVideo(
     bookmarkedByMe: Array.isArray(v.bookmarks) ? v.bookmarks.length > 0 : false,
     isOwner: session?.id === v.userId,
     pinned: Boolean(v.pinnedAt),
-    user: v.user,
+    boostedUntil: v.boostedUntil ? v.boostedUntil.toISOString() : null,
+    user: {
+      id: v.user.id,
+      username: v.user.username,
+      displayName: v.user.displayName,
+      avatarUrl: v.user.avatarUrl,
+      isPro: Boolean(
+        v.user.isPro &&
+          (!v.user.proUntil || v.user.proUntil.getTime() > Date.now())
+      ),
+    },
     repost: repost ?? null,
   };
 }
@@ -54,6 +67,8 @@ const videoInclude = (session: SessionUser | null) => ({
       username: true,
       displayName: true,
       avatarUrl: true,
+      isPro: true,
+      proUntil: true,
     },
   },
   likes: session
@@ -126,7 +141,18 @@ async function buildMixedFeed(
     })),
   ];
 
-  items.sort((a, b) => b.sortAt - a.sortAt);
+  const now = Date.now();
+  function boostScore(item: FeedVideo): number {
+    if (!item.boostedUntil) return 0;
+    const t = new Date(item.boostedUntil).getTime();
+    return t > now ? t : 0;
+  }
+  items.sort((a, b) => {
+    const ba = boostScore(a.item);
+    const bb = boostScore(b.item);
+    if (ba !== bb) return bb - ba;
+    return b.sortAt - a.sortAt;
+  });
   return items.map((i) => i.item);
 }
 

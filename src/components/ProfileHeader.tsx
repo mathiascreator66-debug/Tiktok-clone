@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Link as LinkIcon, Menu, Pencil, UserPlus } from "lucide-react";
+import { Gift, Link as LinkIcon, Menu, Pencil, UserPlus, Sparkles } from "lucide-react";
 import type { ProfileLinkItem } from "@/lib/types";
 import Avatar from "./Avatar";
 import FollowButton from "./FollowButton";
 import SettingsDrawer from "./SettingsDrawer";
+import TipSheet from "./TipSheet";
 import StoryViewer from "./StoryViewer";
 import { formatCount } from "@/lib/format";
 import type { StoryGroup } from "@/lib/types";
@@ -22,6 +23,7 @@ type Props = {
   followingCount: number;
   followerCount: number;
   likeCount: number;
+  isPro?: boolean;
   /** Server hint — client also refetches for freshness */
   hasActiveStories?: boolean;
   links?: ProfileLinkItem[];
@@ -38,10 +40,12 @@ export default function ProfileHeader({
   followingCount: fc,
   followerCount: fr,
   likeCount,
+  isPro = false,
   hasActiveStories = false,
   links = [],
 }: Props) {
   const [drawer, setDrawer] = useState(false);
+  const [tipOpen, setTipOpen] = useState(false);
   const followingCount = fc;
   const [followerCount, setFollowerCount] = useState(fr);
   const [following, setFollowing] = useState(initialFollowing);
@@ -126,16 +130,21 @@ export default function ProfileHeader({
               }`}
             >
               <div className="rounded-full bg-black p-[2px]">
-                <Avatar username={username} avatarUrl={avatarUrl} size={88} />
+                <Avatar username={username} avatarUrl={avatarUrl} size={88} isPro={isPro} />
               </div>
             </div>
           </button>
         ) : (
-          <Avatar username={username} avatarUrl={avatarUrl} size={88} />
+          <Avatar username={username} avatarUrl={avatarUrl} size={88} isPro={isPro} />
         )}
 
         <div className="flex items-center gap-2 mt-3">
           <h1 className="text-xl font-bold">{displayName}</h1>
+          {isPro && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase bg-amber-400 text-black px-1.5 py-0.5 rounded-full">
+              <Sparkles size={10} /> Pro
+            </span>
+          )}
           {isMe && (
             <Link
               href={`/profil/${username}/modifier`}
@@ -206,6 +215,20 @@ export default function ProfileHeader({
               >
                 Publier
               </Link>
+              <Link
+                href="/solde"
+                className="inline-block bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+              >
+                Solde
+              </Link>
+              {!isPro && (
+                <Link
+                  href="/pro"
+                  className="inline-block bg-amber-400/90 text-black px-5 py-2 rounded-md text-sm font-semibold"
+                >
+                  Pro
+                </Link>
+              )}
             </>
           ) : (
             <>
@@ -241,6 +264,22 @@ export default function ProfileHeader({
                   Message
                 </Link>
               )}
+              {isLoggedIn ? (
+                <button
+                  type="button"
+                  onClick={() => setTipOpen(true)}
+                  className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+                >
+                  <Gift size={14} className="text-[#fe2c55]" /> Offrir
+                </button>
+              ) : (
+                <Link
+                  href="/connexion"
+                  className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+                >
+                  <Gift size={14} className="text-[#fe2c55]" /> Offrir
+                </Link>
+              )}
             </>
           )}
         </div>
@@ -271,6 +310,13 @@ export default function ProfileHeader({
           }}
         />
       )}
+
+      <TipSheet
+        open={tipOpen}
+        onClose={() => setTipOpen(false)}
+        toUsername={username}
+        isLoggedIn={isLoggedIn}
+      />
     </>
   );
 }

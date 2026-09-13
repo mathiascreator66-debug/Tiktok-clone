@@ -13,11 +13,13 @@ export type FeedVideo = {
   bookmarkedByMe: boolean;
   isOwner: boolean;
   pinned: boolean;
+  boostedUntil: string | null;
   user: {
     id: string;
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
+    isPro?: boolean;
   };
   /** Présent si cet élément du fil est une republication */
   repost?: {

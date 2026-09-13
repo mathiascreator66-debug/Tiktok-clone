@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
         bookmarkedByMe: false,
         isOwner: true,
         pinned: false,
+        boostedUntil: null,
         user: video.user,
         repost: null,
       },
