@@ -50,6 +50,7 @@ export type CommentUser = {
   username: string;
   avatarUrl: string | null;
   isVerified?: boolean;
+  isPro?: boolean;
 };
 
 export type CommentItem = {
