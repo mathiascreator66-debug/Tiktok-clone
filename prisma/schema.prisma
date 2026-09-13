@@ -65,15 +65,23 @@ model Video {
   id            String          @id @default(cuid())
   caption       String
   videoUrl      String
+  /// Custom cover / thumbnail JPEG (frame ± text baked in)
+  coverUrl      String?
   soundName     String?
-  /// Gallery-uploaded audio URL; when set, playback mutes original video audio
+  /// Gallery-uploaded audio URL; mixes with original (do not force-mute original)
   soundUrl      String?
+  /// Gain for original video audio track (0–2). Default 1 = 100%
+  originalVolume Float          @default(1)
   /// Gain for gallery audio (0–2). Default 1 = 100%
   soundVolume   Float           @default(1)
   /// Trim start of gallery audio in ms
   soundTrimStartMs Int          @default(0)
   /// Trim end of gallery audio in ms; null = full file
   soundTrimEndMs Int?
+  /// Playback trim: start of video clip in ms
+  videoTrimStartMs Int          @default(0)
+  /// Playback trim: end of video clip in ms; null = full file
+  videoTrimEndMs Int?
   /// JSON array of text overlays: {id,text,fontFamily,fontSize,color,bgColor?,align,xPct,yPct,startMs,endMs?,bold,italic,stroke?}
   textOverlays  String?
   /// JSON array of caption cues: {startMs,endMs,text}
@@ -213,8 +221,10 @@ model Story {
   mediaUrl    String
   caption     String?
   soundName   String?
-  /// Gallery-uploaded audio; when set, mute original video audio on playback
+  /// Gallery-uploaded audio; mixes with original (do not force-mute original)
   soundUrl    String?
+  /// Gain for original media audio (0–2)
+  originalVolume Float        @default(1)
   soundVolume Float           @default(1)
   soundTrimStartMs Int        @default(0)
   soundTrimEndMs Int?

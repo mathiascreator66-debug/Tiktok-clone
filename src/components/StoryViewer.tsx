@@ -185,7 +185,7 @@ export default function StoryViewer({
     startTs.current = performance.now();
     pausedRef.current = false;
 
-    // Gallery music: mute original video audio, play attached track (volume + trim)
+    // Mix: play gallery track alongside original (originalVolume); do not force-mute.
     const audioEl = audioRef.current;
     if (audioEl) {
       audioEl.pause();
@@ -226,8 +226,13 @@ export default function StoryViewer({
       const el = videoRef.current;
       if (el) {
         el.currentTime = 0;
-        el.muted = hasGalleryMusic; // mute original when gallery music attached
-        el.play().catch(() => {});
+        el.muted = false;
+        el.volume = elementVolumeFromGain(story.originalVolume ?? 1);
+        // Prefer unmuted; browsers may block — fall back muted silently.
+        el.play().catch(() => {
+          el.muted = true;
+          el.play().catch(() => {});
+        });
       }
       rafRef.current = requestAnimationFrame(tick);
     } else {
@@ -271,7 +276,11 @@ export default function StoryViewer({
     if (story && !isVideo(story.mediaUrl)) {
       startTs.current = performance.now() - pauseAtRef.current * IMAGE_MS;
     }
-    videoRef.current?.play().catch(() => {});
+    const vel = videoRef.current;
+    if (vel) {
+      vel.volume = elementVolumeFromGain(story?.originalVolume ?? 1);
+      vel.play().catch(() => {});
+    }
     if (story?.soundUrl && audioRef.current) {
       audioRef.current.volume = elementVolumeFromGain(story.soundVolume ?? 1);
       audioRef.current.play().catch(() => {});
@@ -341,7 +350,6 @@ export default function StoryViewer({
   if (!mounted || !group || !story) return null;
 
   const video = isVideo(story.mediaUrl);
-  const hasGalleryMusic = Boolean(story.soundUrl);
 
   const ui = (
     <div
@@ -408,7 +416,7 @@ export default function StoryViewer({
             className="absolute inset-0 w-full h-full object-contain bg-black"
             playsInline
             autoPlay
-            muted={hasGalleryMusic}
+            muted={false}
           />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element

@@ -2,12 +2,16 @@ export type FeedVideo = {
   id: string;
   caption: string;
   videoUrl: string;
+  coverUrl: string | null;
   soundName: string | null;
-  /** Gallery music URL — when set, mute original video audio and play this */
+  /** Gallery music URL — mixes with original track (originalVolume) */
   soundUrl: string | null;
+  originalVolume: number;
   soundVolume: number;
   soundTrimStartMs: number;
   soundTrimEndMs: number | null;
+  videoTrimStartMs: number;
+  videoTrimEndMs: number | null;
   textOverlays: import("./media-edit").TextOverlay[];
   captions: import("./media-edit").CaptionCue[];
   createdAt: string;
@@ -65,6 +69,7 @@ export type StoryItem = {
   caption: string | null;
   soundName: string | null;
   soundUrl: string | null;
+  originalVolume: number;
   soundVolume: number;
   soundTrimStartMs: number;
   soundTrimEndMs: number | null;

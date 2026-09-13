@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Film, Images, Music2, X, Camera } from "lucide-react";
+import { Upload, Film, Images, Music2, X, Camera, Image as ImageIcon } from "lucide-react";
 import {
   CAPTION_MAX_LENGTH,
   MAX_UPLOAD_BYTES,
@@ -26,6 +26,8 @@ import AudioTrimControls from "./AudioTrimControls";
 import TextOverlayEditor from "./TextOverlayEditor";
 import CaptionEditor from "./CaptionEditor";
 import CameraCapture, { type CameraResult } from "./CameraCapture";
+import CoverEditor from "./CoverEditor";
+import VideoTrimControls from "./VideoTrimControls";
 
 export default function UploadForm({ username }: { username: string }) {
   const router = useRouter();
@@ -36,9 +38,15 @@ export default function UploadForm({ username }: { username: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [soundName, setSoundName] = useState(originalSoundName(username));
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [originalVolume, setOriginalVolume] = useState(1);
   const [soundVolume, setSoundVolume] = useState(1);
   const [trimStartSec, setTrimStartSec] = useState(0);
   const [trimEndSec, setTrimEndSec] = useState<number | null>(null);
+  const [videoTrimStartSec, setVideoTrimStartSec] = useState(0);
+  const [videoTrimEndSec, setVideoTrimEndSec] = useState<number | null>(null);
+  const [coverBlob, setCoverBlob] = useState<Blob | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverOpen, setCoverOpen] = useState(false);
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
   const [captionCues, setCaptionCues] = useState<CaptionCue[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,9 +58,14 @@ export default function UploadForm({ username }: { username: string }) {
 
   function applyMediaFile(f: File, url: string) {
     if (preview) URL.revokeObjectURL(preview);
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
     setFile(f);
     setPreview(url);
     setDurationSec(null);
+    setVideoTrimStartSec(0);
+    setVideoTrimEndSec(null);
+    setCoverBlob(null);
+    setCoverPreview(null);
     setError("");
     if (f.type.startsWith("video/")) {
       const vid = document.createElement("video");
@@ -132,6 +145,12 @@ export default function UploadForm({ username }: { username: string }) {
     setTrimEndSec(null);
   }
 
+  function clearCover() {
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    setCoverBlob(null);
+    setCoverPreview(null);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) {
@@ -155,6 +174,17 @@ export default function UploadForm({ username }: { username: string }) {
       form.append("video", file);
       form.append("soundName", soundName);
       if (durationSec != null) form.append("durationSec", String(durationSec));
+      form.append("originalVolume", String(originalVolume));
+      form.append(
+        "videoTrimStartMs",
+        String(Math.round(videoTrimStartSec * 1000))
+      );
+      if (videoTrimEndSec != null) {
+        form.append(
+          "videoTrimEndMs",
+          String(Math.round(videoTrimEndSec * 1000))
+        );
+      }
       if (audioFile) {
         form.append("audio", audioFile);
         form.append("soundVolume", String(soundVolume));
@@ -168,6 +198,12 @@ export default function UploadForm({ username }: { username: string }) {
             String(Math.round(trimEndSec * 1000))
           );
         }
+      }
+      if (coverBlob) {
+        form.append(
+          "cover",
+          new File([coverBlob], "cover.jpg", { type: "image/jpeg" })
+        );
       }
       const overlaysJson = serializeOverlays(textOverlays);
       if (overlaysJson) form.append("textOverlays", overlaysJson);
@@ -295,8 +331,79 @@ export default function UploadForm({ username }: { username: string }) {
         </p>
       </div>
 
+      {file && !showCamera && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium text-white/80">Couverture</h3>
+          <div className="flex gap-3 items-center">
+            {coverPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={coverPreview}
+                alt="Couverture"
+                className="w-16 h-28 object-cover rounded-lg bg-white/5"
+              />
+            ) : (
+              <div className="w-16 h-28 rounded-lg bg-white/5 flex items-center justify-center">
+                <ImageIcon size={20} className="text-white/30" />
+              </div>
+            )}
+            <div className="flex-1 space-y-2">
+              <button
+                type="button"
+                onClick={() => setCoverOpen(true)}
+                className="w-full bg-white/10 hover:bg-white/15 rounded-xl py-2.5 text-sm font-medium"
+              >
+                Modifier la couverture
+              </button>
+              {coverPreview && (
+                <button
+                  type="button"
+                  onClick={clearCover}
+                  className="text-xs text-white/45 hover:text-white/70"
+                >
+                  Retirer la couverture personnalisée
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {file && !showCamera && (
+        <VideoTrimControls
+          durationSec={durationSec}
+          trimStartSec={videoTrimStartSec}
+          trimEndSec={videoTrimEndSec}
+          onChange={(s, e) => {
+            setVideoTrimStartSec(s);
+            setVideoTrimEndSec(e);
+          }}
+        />
+      )}
+
       <section className="space-y-2">
         <h3 className="text-sm font-medium text-white/80">Son</h3>
+
+        <div className="rounded-xl bg-white/5 border border-white/10 p-3 space-y-2">
+          <div className="flex justify-between text-[11px] text-white/45">
+            <span>Son original</span>
+            <span>{Math.round(originalVolume * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(originalVolume * 100)}
+            onChange={(e) => setOriginalVolume(Number(e.target.value) / 100)}
+            className="w-full accent-[#25f4ee]"
+            aria-label="Son original"
+          />
+          <p className="text-[10px] text-white/30">
+            Volume de la piste audio de la vidéo (0–100 %).
+          </p>
+        </div>
+
         <div>
           <label className="block text-sm text-white/60 mb-1.5">
             Musique depuis la galerie
@@ -330,8 +437,8 @@ export default function UploadForm({ username }: { username: string }) {
           />
           {audioFile && (
             <p className="text-xs text-white/45 mt-1.5 truncate">
-              {audioFile.name} · {formatBytesFr(audioFile.size)} — la vidéo sera
-              muette, l&apos;audio de galerie jouera
+              {audioFile.name} · {formatBytesFr(audioFile.size)} — mixé avec le
+              son original
             </p>
           )}
           <p className="text-[11px] text-white/30 mt-1">
@@ -361,6 +468,20 @@ export default function UploadForm({ username }: { username: string }) {
           />
         )}
       </section>
+
+      {preview && (
+        <CoverEditor
+          videoUrl={preview}
+          open={coverOpen}
+          onClose={() => setCoverOpen(false)}
+          onConfirm={(blob, url) => {
+            if (coverPreview) URL.revokeObjectURL(coverPreview);
+            setCoverBlob(blob);
+            setCoverPreview(url);
+          }}
+          initialTimeSec={videoTrimStartSec}
+        />
+      )}
 
       <section>
         <h3 className="text-sm font-medium text-white/80 mb-2">Texte</h3>

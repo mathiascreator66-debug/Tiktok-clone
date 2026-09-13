@@ -10,6 +10,7 @@ type VideoItem = {
   id: string;
   caption: string;
   videoUrl: string;
+  coverUrl?: string | null;
   likeCount: number;
   commentCount: number;
   pinned?: boolean;
@@ -46,12 +47,21 @@ export default function ProfileVideoGrid({
             </span>
           )}
           <Link href="/" className="absolute inset-0">
-            <video
-              src={v.videoUrl}
-              className="w-full h-full object-cover"
-              muted
-              preload="metadata"
-            />
+            {v.coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={v.coverUrl}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <video
+                src={v.videoUrl}
+                className="w-full h-full object-cover"
+                muted
+                preload="metadata"
+              />
+            )}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-end p-2 pointer-events-none">
               <div className="flex gap-2 text-xs">
                 <span className="flex items-center gap-0.5">

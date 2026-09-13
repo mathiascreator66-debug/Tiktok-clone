@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
     const soundRaw = String(form.get("soundName") || "").trim();
     const clientDuration = parseClientDuration(form.get("durationSec"));
     const audioFile = form.get("audio") as File | null;
+    const originalVolume = parseGain(form.get("originalVolume"), 1);
     const soundVolume = parseGain(form.get("soundVolume"), 1);
     const soundTrimStartMs = parseTrimMs(form.get("soundTrimStartMs"), 0) ?? 0;
     let soundTrimEndMs = parseTrimMs(form.get("soundTrimEndMs"), null);
@@ -78,6 +79,12 @@ export async function POST(req: NextRequest) {
     ) {
       soundTrimEndMs = null;
     }
+    const videoTrimStartMs = parseTrimMs(form.get("videoTrimStartMs"), 0) ?? 0;
+    let videoTrimEndMs = parseTrimMs(form.get("videoTrimEndMs"), null);
+    if (videoTrimEndMs != null && videoTrimEndMs <= videoTrimStartMs) {
+      videoTrimEndMs = null;
+    }
+    const coverFile = form.get("cover") as File | null;
     const textOverlaysRaw = String(form.get("textOverlays") || "").trim();
     const captionsRaw = String(form.get("captions") || "").trim();
     const textOverlays = textOverlaysRaw
@@ -171,15 +178,49 @@ export async function POST(req: NextRequest) {
       soundName = soundRaw || base;
     }
 
+    let coverUrl: string | null = null;
+    if (coverFile && coverFile.size > 0) {
+      if (
+        !coverFile.type.startsWith("image/") &&
+        !/\.(jpe?g|png|webp)$/i.test(coverFile.name)
+      ) {
+        return NextResponse.json(
+          { error: "Couverture : image JPEG/PNG/WebP requise." },
+          { status: 400 }
+        );
+      }
+      if (coverFile.size > 5 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: "Couverture trop lourde (max 5 Mo)." },
+          { status: 400 }
+        );
+      }
+      const cExt =
+        path.extname(coverFile.name).toLowerCase() ||
+        (coverFile.type.includes("png")
+          ? ".png"
+          : coverFile.type.includes("webp")
+            ? ".webp"
+            : ".jpg");
+      const cName = `${randomUUID()}${cExt === ".jpeg" ? ".jpg" : cExt}`;
+      const coverDir = await ensureUploadDir("covers");
+      await saveUploadFile(coverFile, path.join(coverDir, cName));
+      coverUrl = `/uploads/covers/${cName}`;
+    }
+
     const video = await prisma.video.create({
       data: {
         caption,
         videoUrl: `/uploads/${filename}`,
+        coverUrl,
         soundName: soundName || originalSoundName(session.username),
         soundUrl,
+        originalVolume,
         soundVolume: soundUrl ? soundVolume : 1,
         soundTrimStartMs: soundUrl ? soundTrimStartMs : 0,
         soundTrimEndMs: soundUrl ? soundTrimEndMs : null,
+        videoTrimStartMs,
+        videoTrimEndMs,
         textOverlays,
         captions,
         userId: session.id,
@@ -205,11 +246,15 @@ export async function POST(req: NextRequest) {
         id: video.id,
         caption: video.caption,
         videoUrl: video.videoUrl,
+        coverUrl: video.coverUrl,
         soundName: video.soundName,
         soundUrl: video.soundUrl,
+        originalVolume: video.originalVolume,
         soundVolume: video.soundVolume,
         soundTrimStartMs: video.soundTrimStartMs,
         soundTrimEndMs: video.soundTrimEndMs,
+        videoTrimStartMs: video.videoTrimStartMs,
+        videoTrimEndMs: video.videoTrimEndMs,
         textOverlays: parseOverlaysField(video.textOverlays),
         captions: parseCaptionsField(video.captions),
         createdAt: video.createdAt.toISOString(),

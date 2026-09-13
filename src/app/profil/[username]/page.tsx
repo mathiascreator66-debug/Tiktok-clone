@@ -67,6 +67,7 @@ export default async function ProfilPage({
     id: string;
     caption: string;
     videoUrl: string;
+    coverUrl: string | null;
     likeCount: number;
     commentCount: number;
   }[] = [];
@@ -87,6 +88,7 @@ export default async function ProfilPage({
       id: l.video.id,
       caption: l.video.caption,
       videoUrl: l.video.videoUrl,
+      coverUrl: l.video.coverUrl ?? null,
       likeCount: l.video._count.likes,
       commentCount: l.video._count.comments,
     }));
@@ -115,6 +117,7 @@ export default async function ProfilPage({
           id: v.id,
           caption: v.caption,
           videoUrl: v.videoUrl,
+          coverUrl: v.coverUrl ?? null,
           likeCount: v._count.likes,
           commentCount: v._count.comments,
           pinned: Boolean(v.pinnedAt),

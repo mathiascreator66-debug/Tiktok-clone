@@ -182,10 +182,11 @@ export default function AudioTrimControls({
   return (
     <div className="mt-3 space-y-3 rounded-xl bg-white/5 border border-white/10 p-3">
       <p className="text-xs font-medium text-white/70">Son — volume & coupe</p>
+      {/* Label TikTok: « Son » = musique / audio galerie */}
 
       <div>
         <div className="flex justify-between text-[11px] text-white/45 mb-1">
-          <span>Volume</span>
+          <span>Son</span>
           <span>{Math.round(volume * 100)}%</span>
         </div>
         <input
@@ -196,7 +197,7 @@ export default function AudioTrimControls({
           value={Math.round(volume * 100)}
           onChange={(e) => onVolumeChange(Number(e.target.value) / 100)}
           className="w-full accent-[#fe2c55]"
-          aria-label="Volume du son"
+          aria-label="Son"
         />
       </div>
 

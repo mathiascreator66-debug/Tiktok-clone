@@ -98,6 +98,7 @@ export async function GET(req: NextRequest) {
         id: v.id,
         caption: v.caption,
         videoUrl: v.videoUrl,
+        coverUrl: v.coverUrl ?? null,
         createdAt: v.createdAt.toISOString(),
         likeCount: v._count.likes,
         commentCount: v._count.comments,

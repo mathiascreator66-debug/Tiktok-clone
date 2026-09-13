@@ -7,11 +7,15 @@ type VideoWithRelations = {
   id: string;
   caption: string;
   videoUrl: string;
+  coverUrl?: string | null;
   soundName: string | null;
   soundUrl: string | null;
+  originalVolume?: number | null;
   soundVolume?: number | null;
   soundTrimStartMs?: number | null;
   soundTrimEndMs?: number | null;
+  videoTrimStartMs?: number | null;
+  videoTrimEndMs?: number | null;
   textOverlays?: string | null;
   captions?: string | null;
   pinnedAt: Date | null;
@@ -43,11 +47,15 @@ function mapVideo(
     id: v.id,
     caption: v.caption,
     videoUrl: v.videoUrl,
+    coverUrl: v.coverUrl ?? null,
     soundName: v.soundName,
     soundUrl: v.soundUrl ?? null,
+    originalVolume: typeof v.originalVolume === "number" ? v.originalVolume : 1,
     soundVolume: typeof v.soundVolume === "number" ? v.soundVolume : 1,
     soundTrimStartMs: typeof v.soundTrimStartMs === "number" ? v.soundTrimStartMs : 0,
     soundTrimEndMs: v.soundTrimEndMs ?? null,
+    videoTrimStartMs: typeof v.videoTrimStartMs === "number" ? v.videoTrimStartMs : 0,
+    videoTrimEndMs: v.videoTrimEndMs ?? null,
     textOverlays: parseOverlaysField(v.textOverlays ?? null),
     captions: parseCaptionsField(v.captions ?? null),
     createdAt: v.createdAt.toISOString(),

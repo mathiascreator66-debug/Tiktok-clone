@@ -41,7 +41,6 @@ export default function VideoCard({
   video,
   isActive,
   isLoggedIn,
-  hasInteracted,
   onInteract,
   onDeleted,
   onHide,
@@ -60,7 +59,10 @@ export default function VideoCard({
   const [shareOpen, setShareOpen] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
   const [boostedUntil, setBoostedUntil] = useState(video.boostedUntil);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [paused, setPaused] = useState(false);
+  /** Browser blocked unmuted autoplay — show « Activer le son » until gesture. */
+  const [needsSoundGesture, setNeedsSoundGesture] = useState(false);
   const [liking, setLiking] = useState(false);
   const [reposting, setReposting] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
@@ -75,28 +77,72 @@ export default function VideoCard({
   const likingRef = useRef(false);
   const watchSentRef = useRef(false);
 
+  const videoTrimStartSec = (video.videoTrimStartMs || 0) / 1000;
+  const videoTrimEndSec =
+    video.videoTrimEndMs != null ? video.videoTrimEndMs / 1000 : null;
+
+  // Prefer unmuted autoplay. Browsers often block unmuted autoplay without a
+  // prior user gesture (Chrome/Safari autoplay policy) — on NotAllowedError we
+  // fall back to muted playback and show « Activer le son » until the user taps.
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     el.playbackRate = playbackRate;
-    if (isActive && !commentsOpen && !shareOpen && !tipOpen) {
-      el.currentTime = 0;
+    el.volume = elementVolumeFromGain(video.originalVolume ?? 1);
+
+    if (isActive && !commentsOpen && !shareOpen && !tipOpen && !paused) {
+      const start = videoTrimStartSec;
+      if (el.currentTime < start || (videoTrimEndSec != null && el.currentTime >= videoTrimEndSec)) {
+        el.currentTime = start;
+      }
+      const tryUnmuted = !muted;
+      el.muted = !tryUnmuted;
       const play = el.play();
-      if (play) play.catch(() => {});
+      if (play) {
+        play
+          .then(() => {
+            if (tryUnmuted) setNeedsSoundGesture(false);
+          })
+          .catch((err: unknown) => {
+            const name =
+              err && typeof err === "object" && "name" in err
+                ? String((err as { name: string }).name)
+                : "";
+            if (tryUnmuted && (name === "NotAllowedError" || name === "AbortError")) {
+              el.muted = true;
+              setNeedsSoundGesture(true);
+              el.play().catch(() => {});
+            }
+          });
+      }
     } else if (!isActive) {
       el.pause();
+      setPaused(false);
+    } else {
+      el.pause();
     }
-  }, [isActive, commentsOpen, shareOpen, tipOpen, playbackRate]);
+  }, [
+    isActive,
+    commentsOpen,
+    shareOpen,
+    tipOpen,
+    playbackRate,
+    paused,
+    muted,
+    video.originalVolume,
+    videoTrimStartSec,
+    videoTrimEndSec,
+  ]);
 
   useEffect(() => {
-    if (videoRef.current) {
-      // Gallery music: always mute original video track (documented behavior)
-      const forceMute = Boolean(video.soundUrl) || muted || !hasInteracted;
-      videoRef.current.muted = forceMute;
-    }
-  }, [muted, hasInteracted, video.soundUrl]);
+    const el = videoRef.current;
+    if (!el) return;
+    // Mix: never force-mute original just because gallery music is attached.
+    el.muted = muted || needsSoundGesture;
+    el.volume = elementVolumeFromGain(video.originalVolume ?? 1);
+  }, [muted, needsSoundGesture, video.originalVolume]);
 
-  // Play attached gallery audio with volume + trim; pause when inactive
+  // Play attached gallery audio mixed with original; pause when inactive / muted
   useEffect(() => {
     const audio = audioRef.current;
     const vid = videoRef.current;
@@ -105,9 +151,18 @@ export default function VideoCard({
     const trimEnd =
       video.soundTrimEndMs != null ? video.soundTrimEndMs / 1000 : null;
     audio.volume = elementVolumeFromGain(video.soundVolume ?? 1);
-    // Gain > 1: HTMLAudio max is 1; we store up to 2 for future WebAudio boost
-    if (isActive && !commentsOpen && !shareOpen && !tipOpen && hasInteracted && !muted) {
-      const offset = vid ? vid.currentTime : 0;
+    const canHear = !muted && !needsSoundGesture;
+    if (
+      isActive &&
+      !commentsOpen &&
+      !shareOpen &&
+      !tipOpen &&
+      !paused &&
+      canHear
+    ) {
+      const offset = vid
+        ? Math.max(0, vid.currentTime - videoTrimStartSec)
+        : 0;
       const target = trimStart + offset;
       if (trimEnd != null && target >= trimEnd) {
         audio.pause();
@@ -125,12 +180,14 @@ export default function VideoCard({
     commentsOpen,
     shareOpen,
     tipOpen,
-    hasInteracted,
+    paused,
     muted,
+    needsSoundGesture,
     video.soundUrl,
     video.soundVolume,
     video.soundTrimStartMs,
     video.soundTrimEndMs,
+    videoTrimStartSec,
   ]);
 
   useEffect(() => {
@@ -326,6 +383,33 @@ export default function VideoCard({
     else setToast("Impossible de signaler");
   }
 
+  function unlockSound() {
+    onInteract();
+    setNeedsSoundGesture(false);
+    setMuted(false);
+    const el = videoRef.current;
+    if (el) {
+      el.muted = false;
+      el.volume = elementVolumeFromGain(video.originalVolume ?? 1);
+      el.play().catch(() => {});
+    }
+    const audio = audioRef.current;
+    if (audio && video.soundUrl) {
+      audio.volume = elementVolumeFromGain(video.soundVolume ?? 1);
+      audio.play().catch(() => {});
+    }
+  }
+
+  function toggleMute(e?: React.MouseEvent) {
+    e?.stopPropagation();
+    onInteract();
+    if (needsSoundGesture || muted) {
+      unlockSound();
+      return;
+    }
+    setMuted(true);
+  }
+
   function handleTap() {
     if (commentsOpen || shareOpen) return;
     const now = Date.now();
@@ -347,11 +431,11 @@ export default function VideoCard({
     muteTimerRef.current = setTimeout(() => {
       muteTimerRef.current = null;
       onInteract();
-      if (!hasInteracted) {
-        setMuted(false);
-      } else {
-        setMuted((m) => !m);
+      if (needsSoundGesture) {
+        unlockSound();
+        return;
       }
+      setPaused((p) => !p);
     }, 280);
   }
 
@@ -364,9 +448,9 @@ export default function VideoCard({
         ref={videoRef}
         src={video.videoUrl}
         className="absolute inset-0 w-full h-full object-cover"
-        loop
+        loop={videoTrimEndSec == null && videoTrimStartSec <= 0}
         playsInline
-        muted={Boolean(video.soundUrl) || muted || !hasInteracted}
+        muted={muted || needsSoundGesture}
         onClick={handleTap}
         preload="metadata"
         onTimeUpdate={() => {
@@ -374,11 +458,22 @@ export default function VideoCard({
           const v = videoRef.current;
           if (!v) return;
           setCurrentMs(Math.round(v.currentTime * 1000));
+          // Respect video trim window
+          if (v.currentTime < videoTrimStartSec) {
+            v.currentTime = videoTrimStartSec;
+          }
+          if (videoTrimEndSec != null && v.currentTime >= videoTrimEndSec - 0.05) {
+            v.currentTime = videoTrimStartSec;
+            if (a && video.soundUrl) {
+              a.currentTime = (video.soundTrimStartMs || 0) / 1000;
+            }
+          }
           if (!a || !video.soundUrl) return;
           const trimStart = (video.soundTrimStartMs || 0) / 1000;
           const trimEnd =
             video.soundTrimEndMs != null ? video.soundTrimEndMs / 1000 : null;
-          const target = trimStart + v.currentTime;
+          const offset = Math.max(0, v.currentTime - videoTrimStartSec);
+          const target = trimStart + offset;
           if (trimEnd != null && target >= trimEnd) {
             a.pause();
             return;
@@ -388,11 +483,16 @@ export default function VideoCard({
           }
         }}
         onEnded={() => {
+          const v = videoRef.current;
+          if (v && (videoTrimStartSec > 0 || videoTrimEndSec != null)) {
+            v.currentTime = videoTrimStartSec;
+            v.play().catch(() => {});
+          }
           audioRef.current?.pause();
         }}
         onPlay={() => {
           const a = audioRef.current;
-          if (!a || !video.soundUrl || muted || !hasInteracted) return;
+          if (!a || !video.soundUrl || muted || needsSoundGesture) return;
           a.volume = elementVolumeFromGain(video.soundVolume ?? 1);
           a.play().catch(() => {});
         }}
@@ -609,13 +709,34 @@ export default function VideoCard({
         )}
       </div>
 
+      {needsSoundGesture && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            unlockSound();
+          }}
+          className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-white text-black text-sm font-semibold shadow-lg"
+        >
+          Activer le son
+        </button>
+      )}
+
+      {paused && isActive && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center text-white text-2xl">
+            ▶
+          </div>
+        </div>
+      )}
+
       <button
         type="button"
-        onClick={handleTap}
+        onClick={toggleMute}
         className="absolute top-4 right-4 md:top-16 z-20 p-2 rounded-full bg-black/40"
-        aria-label={muted || !hasInteracted ? "Activer le son" : "Couper le son"}
+        aria-label={muted || needsSoundGesture ? "Activer le son" : "Couper le son"}
       >
-        {muted || !hasInteracted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+        {muted || needsSoundGesture ? <VolumeX size={18} /> : <Volume2 size={18} />}
       </button>
       {(video.captions?.length ?? 0) > 0 && (
         <button

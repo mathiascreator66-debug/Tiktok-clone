@@ -79,6 +79,7 @@ export async function GET() {
           caption: string | null;
           soundName: string | null;
           soundUrl: string | null;
+          originalVolume: number;
           soundVolume: number;
           soundTrimStartMs: number;
           soundTrimEndMs: number | null;
@@ -102,6 +103,7 @@ export async function GET() {
         caption: s.caption,
         soundName: s.soundName,
         soundUrl: s.soundUrl,
+        originalVolume: s.originalVolume ?? 1,
         soundVolume: s.soundVolume ?? 1,
         soundTrimStartMs: s.soundTrimStartMs ?? 0,
         soundTrimEndMs: s.soundTrimEndMs ?? null,
@@ -159,6 +161,7 @@ export async function POST(req: NextRequest) {
     const soundRaw = String(form.get("soundName") || "").trim();
     const audioFile = form.get("audio") as File | null;
     const clientDuration = parseClientDuration(form.get("durationSec"));
+    const originalVolume = parseGain(form.get("originalVolume"), 1);
     const soundVolume = parseGain(form.get("soundVolume"), 1);
     const soundTrimStartMs = parseTrimMs(form.get("soundTrimStartMs"), 0) ?? 0;
     let soundTrimEndMs = parseTrimMs(form.get("soundTrimEndMs"), null);
@@ -269,6 +272,7 @@ export async function POST(req: NextRequest) {
         caption,
         soundName,
         soundUrl,
+        originalVolume,
         soundVolume: soundUrl ? soundVolume : 1,
         soundTrimStartMs: soundUrl ? soundTrimStartMs : 0,
         soundTrimEndMs: soundUrl ? soundTrimEndMs : null,
@@ -295,6 +299,7 @@ export async function POST(req: NextRequest) {
         caption: story.caption,
         soundName: story.soundName,
         soundUrl: story.soundUrl,
+        originalVolume: story.originalVolume,
         soundVolume: story.soundVolume,
         soundTrimStartMs: story.soundTrimStartMs,
         soundTrimEndMs: story.soundTrimEndMs,

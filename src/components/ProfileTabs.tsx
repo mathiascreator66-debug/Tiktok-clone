@@ -8,6 +8,7 @@ type VideoItem = {
   id: string;
   caption: string;
   videoUrl: string;
+  coverUrl?: string | null;
   likeCount: number;
   commentCount: number;
   pinned?: boolean;

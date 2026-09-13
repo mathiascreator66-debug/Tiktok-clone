@@ -26,6 +26,7 @@ export default function StoryUploadForm() {
   const [isVideo, setIsVideo] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [soundName, setSoundName] = useState("");
+  const [originalVolume, setOriginalVolume] = useState(1);
   const [soundVolume, setSoundVolume] = useState(1);
   const [trimStartSec, setTrimStartSec] = useState(0);
   const [trimEndSec, setTrimEndSec] = useState<number | null>(null);
@@ -127,6 +128,7 @@ export default function StoryUploadForm() {
       if (caption.trim()) form.append("caption", caption.trim());
       form.append("media", file);
       if (durationSec != null) form.append("durationSec", String(durationSec));
+      form.append("originalVolume", String(originalVolume));
       if (audioFile) {
         form.append("audio", audioFile);
         if (soundName) form.append("soundName", soundName);
@@ -264,7 +266,26 @@ export default function StoryUploadForm() {
         />
       </div>
 
-      <div>
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-white/80">Son</h3>
+        {isVideo && (
+          <div className="rounded-xl bg-white/5 border border-white/10 p-3 space-y-2">
+            <div className="flex justify-between text-[11px] text-white/45">
+              <span>Son original</span>
+              <span>{Math.round(originalVolume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(originalVolume * 100)}
+              onChange={(e) => setOriginalVolume(Number(e.target.value) / 100)}
+              className="w-full accent-[#25f4ee]"
+              aria-label="Son original"
+            />
+          </div>
+        )}
         <label className="block text-sm text-white/60 mb-1.5">
           Musique depuis la galerie
         </label>
@@ -297,8 +318,8 @@ export default function StoryUploadForm() {
         />
         {audioFile && (
           <p className="text-xs text-white/45 mt-1.5 truncate">
-            {audioFile.name} · {formatBytesFr(audioFile.size)} — média muet +
-            audio galerie
+            {audioFile.name} · {formatBytesFr(audioFile.size)} — mixé avec le son
+            original
           </p>
         )}
         <p className="text-[11px] text-white/30 mt-1">

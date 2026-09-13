@@ -21,6 +21,7 @@ type VideoHit = {
   id: string;
   caption: string;
   videoUrl: string;
+  coverUrl?: string | null;
   likeCount: number;
   commentCount: number;
   user: { username: string; displayName: string | null; avatarUrl: string | null };
@@ -146,12 +147,21 @@ export default function SearchPage() {
                 href={`/?v=${v.id}`}
                 className="relative aspect-[9/16] bg-white/5 rounded overflow-hidden"
               >
-                <video
-                  src={v.videoUrl}
-                  className="w-full h-full object-cover"
-                  muted
-                  preload="metadata"
-                />
+                {v.coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={v.coverUrl}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <video
+                    src={v.videoUrl}
+                    className="w-full h-full object-cover"
+                    muted
+                    preload="metadata"
+                  />
+                )}
                 <div className="absolute inset-x-0 bottom-0 p-1.5 bg-gradient-to-t from-black/70 to-transparent">
                   <p className="text-[10px] line-clamp-2">{v.caption}</p>
                   <p className="text-[10px] text-white/70 flex items-center gap-1 mt-0.5">
