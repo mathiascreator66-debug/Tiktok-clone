@@ -90,14 +90,14 @@ async function main() {
   const demo = await prisma.user.upsert({
     where: { email: "demo@cliptok.local" },
     update: {
-      bio: "Compte démo ClipTok 🎬",
+      bio: "Compte démo ClipTok 🎬 — fil, stories, DMs et maintenant favoris, sons et historique. Bio jusqu’à 250 caractères.",
       displayName: "Démo",
     },
     create: {
       email: "demo@cliptok.local",
       username: "demo",
       passwordHash,
-      bio: "Compte démo ClipTok 🎬",
+      bio: "Compte démo ClipTok 🎬 — fil, stories, DMs et maintenant favoris, sons et historique. Bio jusqu’à 250 caractères.",
       displayName: "Démo",
     },
   });
@@ -105,14 +105,14 @@ async function main() {
   const alice = await prisma.user.upsert({
     where: { email: "alice@cliptok.local" },
     update: {
-      bio: "Créatrice de contenus · voyage & lifestyle",
+      bio: "Créatrice de contenus · voyage & lifestyle. Liens dans la bio ✨",
       displayName: "Alice",
     },
     create: {
       email: "alice@cliptok.local",
       username: "alice",
       passwordHash,
-      bio: "Créatrice de contenus · voyage & lifestyle",
+      bio: "Créatrice de contenus · voyage & lifestyle. Liens dans la bio ✨",
       displayName: "Alice",
     },
   });
@@ -147,6 +147,11 @@ async function main() {
     },
   });
 
+  await prisma.watchEvent.deleteMany({});
+  await prisma.bookmark.deleteMany({});
+  await prisma.notInterested.deleteMany({});
+  await prisma.report.deleteMany({});
+  await prisma.profileLink.deleteMany({});
   await prisma.message.deleteMany({});
   await prisma.conversation.deleteMany({});
   await prisma.storyView.deleteMany({});
@@ -171,6 +176,13 @@ async function main() {
   }
 
   const authors = [demo, alice, bob, demo, alice];
+  const sounds = [
+    "Son original — @demo",
+    "Summer vibes — ClipTok Sounds",
+    "Piano émotion — ClipTok Sounds",
+    "Son original — @demo",
+    "Lofi night — ClipTok Sounds",
+  ];
   for (let i = 0; i < SAMPLES.length; i++) {
     const s = SAMPLES[i];
     await prisma.video.create({
@@ -178,9 +190,34 @@ async function main() {
         caption: s.caption,
         videoUrl: `/uploads/${s.file}`,
         userId: authors[i].id,
+        soundName: sounds[i],
+        pinnedAt: i === 0 ? new Date() : null,
       },
     });
   }
+
+  await prisma.profileLink.createMany({
+    data: [
+      {
+        userId: demo.id,
+        url: "https://github.com",
+        label: "GitHub",
+        sortOrder: 0,
+      },
+      {
+        userId: demo.id,
+        url: "https://cliptok.local",
+        label: "ClipTok",
+        sortOrder: 1,
+      },
+      {
+        userId: alice.id,
+        url: "https://example.com/alice",
+        label: "Portfolio",
+        sortOrder: 0,
+      },
+    ],
+  });
 
   // Ensure comments upload dir + demo image for image comments
   const commentsDir = path.join(uploadsDir, "comments");
@@ -277,6 +314,50 @@ async function main() {
     });
     await prisma.commentLike.create({
       data: { userId: charlie.id, commentId: c2.id },
+    });
+  }
+
+  const videosAfter = await prisma.video.findMany({ orderBy: { createdAt: "asc" } });
+  if (videosAfter[0]) {
+    await prisma.bookmark.create({
+      data: { userId: alice.id, videoId: videosAfter[0].id },
+    });
+    await prisma.bookmark.create({
+      data: { userId: bob.id, videoId: videosAfter[0].id },
+    });
+  }
+  if (videosAfter[1]) {
+    await prisma.bookmark.create({
+      data: { userId: demo.id, videoId: videosAfter[1].id },
+    });
+  }
+
+  const now = Date.now();
+  if (videosAfter[1]) {
+    await prisma.watchEvent.create({
+      data: {
+        userId: demo.id,
+        videoId: videosAfter[1].id,
+        watchedAt: new Date(now - 60 * 60 * 1000),
+      },
+    });
+  }
+  if (videosAfter[2]) {
+    await prisma.watchEvent.create({
+      data: {
+        userId: demo.id,
+        videoId: videosAfter[2].id,
+        watchedAt: new Date(now - 26 * 60 * 60 * 1000),
+      },
+    });
+  }
+  if (videosAfter[3]) {
+    await prisma.watchEvent.create({
+      data: {
+        userId: demo.id,
+        videoId: videosAfter[3].id,
+        watchedAt: new Date(now - 4 * 24 * 60 * 60 * 1000),
+      },
     });
   }
 

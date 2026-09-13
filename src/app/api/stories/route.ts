@@ -5,8 +5,9 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { ensureUploadDir } from "@/lib/uploads";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL } from "@/lib/limits";
 
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = MAX_UPLOAD_BYTES;
 const ALLOWED = new Set([
   "image/jpeg",
   "image/png",
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
     }
     if (file.size > MAX_BYTES) {
       return NextResponse.json(
-        { error: "Fichier trop lourd (max 15 Mo)." },
+        { error: `Fichier trop lourd (max ${MAX_UPLOAD_LABEL}).` },
         { status: 400 }
       );
     }

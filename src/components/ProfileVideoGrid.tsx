@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, Pin } from "lucide-react";
 import VideoOwnerMenu from "./VideoOwnerMenu";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -12,6 +12,7 @@ type VideoItem = {
   videoUrl: string;
   likeCount: number;
   commentCount: number;
+  pinned?: boolean;
 };
 
 export default function ProfileVideoGrid({
@@ -39,6 +40,11 @@ export default function ProfileVideoGrid({
           key={v.id}
           className="relative aspect-[9/16] bg-white/5 rounded overflow-hidden group"
         >
+          {v.pinned && (
+            <span className="absolute top-1 left-1 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-semibold">
+              <Pin size={9} /> Épinglé
+            </span>
+          )}
           <Link href="/" className="absolute inset-0">
             <video
               src={v.videoUrl}
@@ -62,11 +68,24 @@ export default function ProfileVideoGrid({
               <VideoOwnerMenu
                 videoId={v.id}
                 caption={v.caption}
+                pinned={v.pinned}
                 variant="grid"
                 onCaptionUpdated={(caption) => {
                   setVideos((prev) =>
                     prev.map((x) => (x.id === v.id ? { ...x, caption } : x))
                   );
+                }}
+                onPinned={(pinned) => {
+                  setVideos((prev) => {
+                    const next = prev.map((x) =>
+                      x.id === v.id ? { ...x, pinned } : x
+                    );
+                    return [...next].sort((a, b) => {
+                      if (a.pinned && !b.pinned) return -1;
+                      if (!a.pinned && b.pinned) return 1;
+                      return 0;
+                    });
+                  });
                 }}
                 onDeleted={() => {
                   setVideos((prev) => prev.filter((x) => x.id !== v.id));

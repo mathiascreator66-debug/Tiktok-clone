@@ -2,7 +2,8 @@
 const nextConfig = {
   experimental: {
     serverActions: {
-      bodySizeLimit: "50mb",
+      // 100 MB = 104857600 bytes — videos, stories, related uploads
+      bodySizeLimit: "100mb",
     },
   },
 };

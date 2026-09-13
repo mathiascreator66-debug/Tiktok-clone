@@ -10,6 +10,7 @@ type VideoItem = {
   videoUrl: string;
   likeCount: number;
   commentCount: number;
+  pinned?: boolean;
 };
 
 type Props = {

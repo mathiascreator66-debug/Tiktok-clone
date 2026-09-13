@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Users, MessageCircle, User, LogOut, LogIn } from "lucide-react";
+import { Home, Users, MessageCircle, User, LogOut, LogIn, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type Props = {
@@ -68,11 +68,15 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
     pathname.startsWith("/messages/") && pathname !== "/messages";
 
   const isHome = pathname === "/";
+  const isSearch = pathname.startsWith("/recherche");
   const isAmis = pathname.startsWith("/amis");
   const isUpload = pathname.startsWith("/telecharger");
   const isMessages = pathname.startsWith("/messages");
   const isProfil =
-    pathname.startsWith("/profil") || pathname.startsWith("/parametres");
+    pathname.startsWith("/profil") ||
+    pathname.startsWith("/parametres") ||
+    pathname.startsWith("/historique") ||
+    pathname.startsWith("/activite");
 
   return (
     <>
@@ -88,6 +92,12 @@ export default function Navbar({ user, initialUnread = 0 }: Props) {
             className={`hover:text-[#fe2c55] ${isHome ? "text-[#fe2c55]" : "text-white/80"}`}
           >
             Pour toi
+          </Link>
+          <Link
+            href="/recherche"
+            className={`hover:text-[#fe2c55] flex items-center gap-1 ${isSearch ? "text-[#fe2c55]" : "text-white/80"}`}
+          >
+            <Search size={14} /> Recherche
           </Link>
           {user ? (
             <>

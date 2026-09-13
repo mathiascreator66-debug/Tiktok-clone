@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Activity,
   Download,
+  History,
 } from "lucide-react";
 import { getSession } from "@/lib/auth";
 
@@ -37,9 +38,14 @@ export default async function ParametresPage() {
           label="Centre des activités"
         />
         <LinkItem
+          href="/historique"
+          icon={<History size={20} />}
+          label="Historique de visionnage"
+        />
+        <LinkItem
           href="/telecharger"
           icon={<Clapperboard size={20} />}
-          label="Publier une vidéo"
+          label="ClipTok Studio"
         />
         <LinkItem
           href="/telecharger?tab=story"

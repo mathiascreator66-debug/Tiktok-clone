@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type Props = {
   videoId: string;
   caption: string;
+  pinned?: boolean;
   onCaptionUpdated?: (caption: string) => void;
+  onPinned?: (pinned: boolean) => void;
   onDeleted?: () => void;
   /** Compact icon for feed */
   variant?: "feed" | "grid";
@@ -16,7 +18,9 @@ type Props = {
 export default function VideoOwnerMenu({
   videoId,
   caption,
+  pinned = false,
   onCaptionUpdated,
+  onPinned,
   onDeleted,
   variant = "feed",
 }: Props) {
@@ -26,6 +30,7 @@ export default function VideoOwnerMenu({
   const [draft, setDraft] = useState(caption);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isPinned, setIsPinned] = useState(pinned);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -85,6 +90,27 @@ export default function VideoOwnerMenu({
     }
   }
 
+  async function togglePin() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/videos/${videoId}/pin`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Erreur");
+        return;
+      }
+      setIsPinned(data.pinned);
+      onPinned?.(data.pinned);
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError("Erreur réseau.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -122,6 +148,18 @@ export default function VideoOwnerMenu({
               >
                 <Pencil size={16} /> Modifier la légende
               </button>
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/10 text-left"
+                onClick={togglePin}
+                disabled={loading}
+              >
+                {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+                {isPinned ? "Désépingler" : "Épingler"}
+              </button>
+              {error && !editing && (
+                <p className="px-3 py-1.5 text-[11px] text-[#fe2c55]">{error}</p>
+              )}
               <button
                 type="button"
                 className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/10 text-[#fe2c55] text-left"

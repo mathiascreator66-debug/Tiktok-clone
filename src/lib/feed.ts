@@ -6,6 +6,8 @@ type VideoWithRelations = {
   id: string;
   caption: string;
   videoUrl: string;
+  soundName: string | null;
+  pinnedAt: Date | null;
   createdAt: Date;
   userId: string;
   user: {
@@ -16,7 +18,8 @@ type VideoWithRelations = {
   };
   likes: { id: string }[] | false;
   reposts: { id: string }[] | false;
-  _count: { likes: number; comments: number; reposts: number };
+  bookmarks: { id: string }[] | false;
+  _count: { likes: number; comments: number; reposts: number; bookmarks: number };
 };
 
 function mapVideo(
@@ -28,13 +31,17 @@ function mapVideo(
     id: v.id,
     caption: v.caption,
     videoUrl: v.videoUrl,
+    soundName: v.soundName,
     createdAt: v.createdAt.toISOString(),
     likeCount: v._count.likes,
     commentCount: v._count.comments,
     repostCount: v._count.reposts,
+    bookmarkCount: v._count.bookmarks,
     likedByMe: Array.isArray(v.likes) ? v.likes.length > 0 : false,
     repostedByMe: Array.isArray(v.reposts) ? v.reposts.length > 0 : false,
+    bookmarkedByMe: Array.isArray(v.bookmarks) ? v.bookmarks.length > 0 : false,
     isOwner: session?.id === v.userId,
+    pinned: Boolean(v.pinnedAt),
     user: v.user,
     repost: repost ?? null,
   };
@@ -55,15 +62,34 @@ const videoInclude = (session: SessionUser | null) => ({
   reposts: session
     ? { where: { userId: session.id }, select: { id: true } }
     : (false as const),
-  _count: { select: { likes: true, comments: true, reposts: true } },
+  bookmarks: session
+    ? { where: { userId: session.id }, select: { id: true } }
+    : (false as const),
+  _count: { select: { likes: true, comments: true, reposts: true, bookmarks: true } },
 });
+
+async function hiddenVideoIds(session: SessionUser | null): Promise<string[]> {
+  if (!session) return [];
+  const rows = await prisma.notInterested.findMany({
+    where: { userId: session.id },
+    select: { videoId: true },
+  });
+  return rows.map((r) => r.videoId);
+}
 
 async function buildMixedFeed(
   session: SessionUser | null,
   userIds?: string[]
 ): Promise<FeedVideo[]> {
-  const videoWhere = userIds ? { userId: { in: userIds } } : undefined;
-  const repostWhere = userIds ? { userId: { in: userIds } } : undefined;
+  const hidden = await hiddenVideoIds(session);
+  const videoWhere = {
+    ...(userIds ? { userId: { in: userIds } } : {}),
+    ...(hidden.length ? { id: { notIn: hidden } } : {}),
+  };
+  const repostWhere = {
+    ...(userIds ? { userId: { in: userIds } } : {}),
+    ...(hidden.length ? { videoId: { notIn: hidden } } : {}),
+  };
 
   const [videos, reposts] = await Promise.all([
     prisma.video.findMany({

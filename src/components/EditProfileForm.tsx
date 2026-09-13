@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Avatar from "./Avatar";
 import Link from "next/link";
-import { Camera } from "lucide-react";
+import { Camera, Plus, Trash2 } from "lucide-react";
+import { BIO_MAX_LENGTH, MAX_PROFILE_LINKS } from "@/lib/limits";
+import type { ProfileLinkItem } from "@/lib/types";
 
 type User = {
   id: string;
@@ -12,6 +14,7 @@ type User = {
   displayName: string | null;
   avatarUrl: string | null;
   bio: string | null;
+  links?: ProfileLinkItem[];
 };
 
 export default function EditProfileForm({ user }: { user: User }) {
@@ -19,7 +22,10 @@ export default function EditProfileForm({ user }: { user: User }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [username, setUsername] = useState(user.username);
   const [displayName, setDisplayName] = useState(user.displayName || "");
-  const [bio, setBio] = useState(user.bio || "");
+  const [bio, setBio] = useState((user.bio || "").slice(0, BIO_MAX_LENGTH));
+  const [links, setLinks] = useState<{ url: string; label: string }[]>(
+    (user.links || []).map((l) => ({ url: l.url, label: l.label || "" }))
+  );
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
   const [externalUrl, setExternalUrl] = useState(
     user.avatarUrl && !user.avatarUrl.startsWith("/uploads/")
@@ -82,6 +88,12 @@ export default function EditProfileForm({ user }: { user: User }) {
           displayName: displayName.trim() || null,
           bio: bio.trim() || null,
           avatarUrl: nextAvatar,
+          links: links
+            .filter((l) => l.url.trim())
+            .map((l) => ({
+              url: l.url.trim(),
+              label: l.label.trim() || null,
+            })),
         }),
       });
       const data = await res.json();
@@ -168,15 +180,76 @@ export default function EditProfileForm({ user }: { user: User }) {
         <label className="block text-sm text-white/60 mb-1.5">Bio</label>
         <textarea
           value={bio}
-          onChange={(e) => setBio(e.target.value)}
+          onChange={(e) => setBio(e.target.value.slice(0, BIO_MAX_LENGTH))}
           rows={4}
-          maxLength={300}
+          maxLength={BIO_MAX_LENGTH}
           placeholder="Parlez un peu de vous…"
           className="w-full bg-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-[#fe2c55] resize-none"
         />
         <p className="text-[11px] text-white/35 mt-1 text-right">
-          {bio.length}/300
+          {BIO_MAX_LENGTH - bio.length} caractères restants
         </p>
+      </div>
+
+      <div>
+        <label className="block text-sm text-white/60 mb-1.5">
+          Liens (max {MAX_PROFILE_LINKS})
+        </label>
+        <div className="space-y-2">
+          {links.map((link, i) => (
+            <div key={i} className="flex gap-2">
+              <div className="flex-1 space-y-1.5">
+                <input
+                  type="url"
+                  value={link.url}
+                  onChange={(e) =>
+                    setLinks((prev) =>
+                      prev.map((x, j) =>
+                        j === i ? { ...x, url: e.target.value } : x
+                      )
+                    )
+                  }
+                  placeholder="https://…"
+                  className="w-full bg-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#fe2c55]"
+                />
+                <input
+                  value={link.label}
+                  onChange={(e) =>
+                    setLinks((prev) =>
+                      prev.map((x, j) =>
+                        j === i ? { ...x, label: e.target.value } : x
+                      )
+                    )
+                  }
+                  placeholder="Libellé (optionnel)"
+                  maxLength={40}
+                  className="w-full bg-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:ring-1 focus:ring-[#fe2c55]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setLinks((prev) => prev.filter((_, j) => j !== i))
+                }
+                className="p-2 h-fit rounded-full hover:bg-white/10 text-white/50"
+                aria-label="Supprimer le lien"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+          {links.length < MAX_PROFILE_LINKS && (
+            <button
+              type="button"
+              onClick={() =>
+                setLinks((prev) => [...prev, { url: "", label: "" }])
+              }
+              className="flex items-center gap-1.5 text-sm font-semibold text-[#25f4ee]"
+            >
+              <Plus size={14} /> Ajouter un lien
+            </button>
+          )}
+        </div>
       </div>
 
       <div>

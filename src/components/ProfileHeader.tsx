@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Menu, Pencil, UserPlus } from "lucide-react";
+import { Link as LinkIcon, Menu, Pencil, UserPlus } from "lucide-react";
+import type { ProfileLinkItem } from "@/lib/types";
 import Avatar from "./Avatar";
 import FollowButton from "./FollowButton";
 import SettingsDrawer from "./SettingsDrawer";
@@ -23,6 +24,7 @@ type Props = {
   likeCount: number;
   /** Server hint — client also refetches for freshness */
   hasActiveStories?: boolean;
+  links?: ProfileLinkItem[];
 };
 
 export default function ProfileHeader({
@@ -37,6 +39,7 @@ export default function ProfileHeader({
   followerCount: fr,
   likeCount,
   hasActiveStories = false,
+  links = [],
 }: Props) {
   const [drawer, setDrawer] = useState(false);
   const followingCount = fc;
@@ -160,6 +163,33 @@ export default function ProfileHeader({
             Pas encore de bio — ajoutez-en une !
           </p>
         ) : null}
+
+        {links.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-2 mt-3 px-2">
+            {links.map((l, i) => {
+              let host = l.label;
+              if (!host) {
+                try {
+                  host = new URL(l.url).hostname.replace(/^www\./, "");
+                } catch {
+                  host = l.url;
+                }
+              }
+              return (
+                <a
+                  key={l.id || i}
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/15 text-xs font-medium text-[#25f4ee]"
+                >
+                  <LinkIcon size={11} />
+                  {host}
+                </a>
+              );
+            })}
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-2 justify-center">
           {isMe ? (

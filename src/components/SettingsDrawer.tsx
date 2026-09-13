@@ -11,6 +11,7 @@ import {
   Settings,
   ChevronRight,
   Database,
+  History,
 } from "lucide-react";
 
 type Props = {
@@ -62,6 +63,12 @@ export default function SettingsDrawer({ open, onClose }: Props) {
               onClick={onClose}
               icon={<Activity size={20} />}
               label="Centre des activités"
+            />
+            <LinkItem
+              href="/historique"
+              onClick={onClose}
+              icon={<History size={20} />}
+              label="Historique de visionnage"
             />
             <LinkItem
               href="/parametres/qr"

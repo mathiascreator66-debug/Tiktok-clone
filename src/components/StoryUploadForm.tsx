@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, ImagePlus } from "lucide-react";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, formatBytesFr } from "@/lib/limits";
 
 export default function StoryUploadForm() {
   const router = useRouter();
@@ -17,6 +18,10 @@ export default function StoryUploadForm() {
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (f.size > MAX_UPLOAD_BYTES) {
+      setError(`Fichier trop lourd (max ${MAX_UPLOAD_LABEL}).`);
+      return;
+    }
     if (preview) URL.revokeObjectURL(preview);
     setFile(f);
     setIsVideo(f.type.startsWith("video/"));
@@ -30,8 +35,8 @@ export default function StoryUploadForm() {
       setError("Choisissez une image ou une courte vidéo.");
       return;
     }
-    if (file.size > 15 * 1024 * 1024) {
-      setError("Fichier trop lourd (max 15 Mo).");
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError(`Fichier trop lourd (max ${MAX_UPLOAD_LABEL}).`);
       return;
     }
     setLoading(true);
@@ -85,10 +90,13 @@ export default function StoryUploadForm() {
           )
         ) : (
           <>
-            <ImagePlus size={48} className="text-white/30 mb-3" />
-            <p className="text-white/50 text-sm">Image ou vidéo courte</p>
-            <p className="text-white/30 text-xs mt-1">
-              JPEG, PNG, WebP, MP4 — max 15 Mo · expire en 24 h
+            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mb-3">
+              <ImagePlus size={28} className="text-white/50" />
+            </div>
+            <p className="text-white/70 text-sm font-medium">Galerie</p>
+            <p className="text-white/45 text-sm mt-1">Image ou vidéo courte</p>
+            <p className="text-white/30 text-xs mt-2">
+              JPEG, PNG, WebP, MP4 — max {MAX_UPLOAD_LABEL} · expire en 24 h
             </p>
           </>
         )}
@@ -100,6 +108,16 @@ export default function StoryUploadForm() {
           onChange={onFileChange}
         />
       </div>
+
+      {file && (
+        <p className="text-xs text-white/45 truncate">
+          {file.name} · {formatBytesFr(file.size)}
+        </p>
+      )}
+
+      <p className="text-[12px] text-white/40">
+        Story : idéalement 15 s. Les stories expirent après 24 h.
+      </p>
 
       <div>
         <label className="block text-sm text-white/60 mb-1.5">

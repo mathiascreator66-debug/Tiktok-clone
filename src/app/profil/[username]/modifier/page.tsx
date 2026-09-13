@@ -22,6 +22,10 @@ export default async function ModifierProfilPage({
       displayName: true,
       avatarUrl: true,
       bio: true,
+      profileLinks: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, url: true, label: true },
+      },
     },
   });
 
@@ -41,7 +45,16 @@ export default async function ModifierProfilPage({
         </Link>
         <h1 className="text-2xl font-bold mt-3">Modifier le profil</h1>
       </div>
-      <EditProfileForm user={user} />
+      <EditProfileForm
+        user={{
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+          bio: user.bio,
+          links: user.profileLinks,
+        }}
+      />
     </div>
   );
 }

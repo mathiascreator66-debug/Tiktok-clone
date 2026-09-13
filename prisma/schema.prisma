@@ -8,39 +8,52 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  username     String    @unique
-  passwordHash String?
-  displayName  String?
-  avatarUrl    String?
-  bio          String?
-  googleId     String?   @unique
-  createdAt    DateTime  @default(now())
-  videos       Video[]
-  likes        Like[]
-  comments     Comment[]
-  commentLikes CommentLike[]
-  reposts      Repost[]
-  following    Follow[]  @relation("Following")
-  followers    Follow[]  @relation("Followers")
+  id            String          @id @default(cuid())
+  email         String          @unique
+  username      String          @unique
+  passwordHash  String?
+  displayName   String?
+  avatarUrl     String?
+  bio           String?
+  googleId      String?         @unique
+  createdAt     DateTime        @default(now())
+  videos        Video[]
+  likes         Like[]
+  comments      Comment[]
+  commentLikes  CommentLike[]
+  reposts       Repost[]
+  following     Follow[]        @relation("Following")
+  followers     Follow[]        @relation("Followers")
   conversationsA Conversation[] @relation("ConvA")
   conversationsB Conversation[] @relation("ConvB")
-  messages     Message[]
-  stories      Story[]
-  storyViews   StoryView[]
+  messages      Message[]
+  stories       Story[]
+  storyViews    StoryView[]
+  bookmarks     Bookmark[]
+  notInterested NotInterested[]
+  reports       Report[]
+  profileLinks  ProfileLink[]
+  watchEvents   WatchEvent[]
 }
 
 model Video {
-  id        String    @id @default(cuid())
-  caption   String
-  videoUrl  String
-  createdAt DateTime  @default(now())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  likes     Like[]
-  comments  Comment[]
-  reposts   Repost[]
+  id            String          @id @default(cuid())
+  caption       String
+  videoUrl      String
+  soundName     String?
+  pinnedAt      DateTime?
+  createdAt     DateTime        @default(now())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes         Like[]
+  comments      Comment[]
+  reposts       Repost[]
+  bookmarks     Bookmark[]
+  notInterested NotInterested[]
+  reports       Report[]
+  watchEvents   WatchEvent[]
+
+  @@index([userId, pinnedAt])
 }
 
 model Like {
@@ -123,14 +136,14 @@ model Conversation {
 }
 
 model Message {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   senderId       String
   body           String
-  createdAt      DateTime      @default(now())
+  createdAt      DateTime     @default(now())
   readAt         DateTime?
-  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
   @@index([senderId])
@@ -160,4 +173,62 @@ model StoryView {
 
   @@unique([userId, storyId])
   @@index([storyId])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  videoId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+  @@index([videoId])
+}
+
+model NotInterested {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  videoId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  videoId   String
+  reason    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+}
+
+model ProfileLink {
+  id        String @id @default(cuid())
+  userId    String
+  url       String
+  label     String?
+  sortOrder Int    @default(0)
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WatchEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  watchedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([userId, watchedAt])
+  @@index([videoId])
 }

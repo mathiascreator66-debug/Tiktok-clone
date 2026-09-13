@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import VideoCard from "./VideoCard";
 import StoryRail from "./StoryRail";
 import type { FeedVideo } from "@/lib/types";
@@ -134,6 +135,13 @@ export default function VideoFeed({
             <span className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[3px] w-8 rounded-full bg-white" />
           )}
         </button>
+        <Link
+          href="/recherche"
+          className="relative pb-1 text-white/50 hover:text-white transition-colors flex items-center gap-1"
+        >
+          <Search size={14} />
+          Recherche
+        </Link>
       </div>
     </div>
   );
@@ -245,10 +253,15 @@ export default function VideoFeed({
                 hasInteracted={hasInteracted}
                 onInteract={onInteract}
                 onDeleted={() => {
-                  const removeAt = (prev: FeedVideo[]) =>
-                    prev.filter((_, idx) => idx !== i);
-                  if (tab === "foryou") setForYouVideos(removeAt);
-                  else setFollowingVideos((prev) => removeAt(prev ?? []));
+                  const removeId = (prev: FeedVideo[]) =>
+                    prev.filter((x) => x.id !== video.id);
+                  if (tab === "foryou") setForYouVideos(removeId);
+                  else setFollowingVideos((prev) => removeId(prev ?? []));
+                }}
+                onHide={(id) => {
+                  const remove = (prev: FeedVideo[]) => prev.filter((x) => x.id !== id);
+                  setForYouVideos(remove);
+                  setFollowingVideos((prev) => (prev ? remove(prev) : prev));
                 }}
               />
             </div>

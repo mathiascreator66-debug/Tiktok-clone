@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession, getSession } from "@/lib/auth";
+import { BIO_MAX_LENGTH, MAX_PROFILE_LINKS } from "@/lib/limits";
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -19,9 +20,9 @@ export async function PATCH(req: NextRequest) {
 
     if ("bio" in body) {
       const bio = body.bio == null ? null : String(body.bio).trim();
-      if (bio && bio.length > 300) {
+      if (bio && bio.length > BIO_MAX_LENGTH) {
         return NextResponse.json(
-          { error: "La bio est limitée à 300 caractères." },
+          { error: `La bio est limitée à ${BIO_MAX_LENGTH} caractères.` },
           { status: 400 }
         );
       }
@@ -88,26 +89,89 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    if (Object.keys(data).length === 0) {
+    let linksPayload: { url: string; label: string | null }[] | null = null;
+    if ("links" in body) {
+      if (!Array.isArray(body.links)) {
+        return NextResponse.json(
+          { error: "Les liens doivent être une liste." },
+          { status: 400 }
+        );
+      }
+      if (body.links.length > MAX_PROFILE_LINKS) {
+        return NextResponse.json(
+          { error: `Maximum ${MAX_PROFILE_LINKS} liens.` },
+          { status: 400 }
+        );
+      }
+      const parsed: { url: string; label: string | null }[] = [];
+      for (const raw of body.links) {
+        const url = String(raw?.url || "").trim();
+        if (!url) continue;
+        try {
+          const u = new URL(url);
+          if (u.protocol !== "http:" && u.protocol !== "https:") {
+            return NextResponse.json(
+              { error: "Chaque lien doit commencer par http:// ou https://." },
+              { status: 400 }
+            );
+          }
+        } catch {
+          return NextResponse.json(
+            { error: "URL de lien invalide." },
+            { status: 400 }
+          );
+        }
+        const label =
+          raw?.label == null || !String(raw.label).trim()
+            ? null
+            : String(raw.label).trim().slice(0, 40);
+        parsed.push({ url, label });
+      }
+      linksPayload = parsed;
+    }
+
+    if (Object.keys(data).length === 0 && linksPayload === null) {
       return NextResponse.json(
         { error: "Aucune modification." },
         { status: 400 }
       );
     }
 
-    const user = await prisma.user.update({
-      where: { id: session.id },
-      data,
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        displayName: true,
-        avatarUrl: true,
-        bio: true,
-        createdAt: true,
-      },
-    });
+    const userSelect = {
+      id: true,
+      email: true,
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+      bio: true,
+      createdAt: true,
+    } as const;
+
+    const user =
+      Object.keys(data).length > 0
+        ? await prisma.user.update({
+            where: { id: session.id },
+            data,
+            select: userSelect,
+          })
+        : await prisma.user.findUniqueOrThrow({
+            where: { id: session.id },
+            select: userSelect,
+          });
+
+    if (linksPayload !== null) {
+      await prisma.profileLink.deleteMany({ where: { userId: session.id } });
+      if (linksPayload.length) {
+        await prisma.profileLink.createMany({
+          data: linksPayload.map((l, i) => ({
+            userId: session.id,
+            url: l.url,
+            label: l.label,
+            sortOrder: i,
+          })),
+        });
+      }
+    }
 
     // Rafraîchir le cookie JWT si username/avatar change
     await createSession({
@@ -117,7 +181,13 @@ export async function PATCH(req: NextRequest) {
       avatarUrl: user.avatarUrl,
     });
 
-    return NextResponse.json({ user });
+    const links = await prisma.profileLink.findMany({
+      where: { userId: user.id },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, url: true, label: true },
+    });
+
+    return NextResponse.json({ user: { ...user, links } });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
@@ -140,12 +210,17 @@ export async function GET() {
         avatarUrl: true,
         bio: true,
         createdAt: true,
+        profileLinks: {
+          orderBy: { sortOrder: "asc" },
+          select: { id: true, url: true, label: true },
+        },
       },
     });
     if (!user) {
       return NextResponse.json({ error: "Utilisateur introuvable." }, { status: 404 });
     }
-    return NextResponse.json({ user });
+    const { profileLinks, ...rest } = user;
+    return NextResponse.json({ user: { ...rest, links: profileLinks } });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });

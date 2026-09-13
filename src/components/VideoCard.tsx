@@ -10,12 +10,17 @@ import {
   Volume2,
   VolumeX,
   Music2,
+  Bookmark,
 } from "lucide-react";
 import Avatar from "./Avatar";
 import CommentPanel from "./CommentPanel";
 import Toast from "./Toast";
 import VideoOwnerMenu from "./VideoOwnerMenu";
+import ShareSheet from "./ShareSheet";
 import type { FeedVideo } from "@/lib/types";
+import { soundLabel } from "@/lib/sounds";
+import { formatCount } from "@/lib/format";
+import type { PlaybackRate } from "@/lib/limits";
 
 type Props = {
   video: FeedVideo;
@@ -24,6 +29,7 @@ type Props = {
   hasInteracted: boolean;
   onInteract: () => void;
   onDeleted?: () => void;
+  onHide?: (videoId: string) => void;
 };
 
 export default function VideoCard({
@@ -33,6 +39,7 @@ export default function VideoCard({
   hasInteracted,
   onInteract,
   onDeleted,
+  onHide,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [liked, setLiked] = useState(video.likedByMe);
@@ -40,35 +47,57 @@ export default function VideoCard({
   const [commentCount, setCommentCount] = useState(video.commentCount);
   const [reposted, setReposted] = useState(video.repostedByMe);
   const [repostCount, setRepostCount] = useState(video.repostCount);
+  const [bookmarked, setBookmarked] = useState(video.bookmarkedByMe);
+  const [bookmarkCount, setBookmarkCount] = useState(video.bookmarkCount);
   const [caption, setCaption] = useState(video.caption);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [muted, setMuted] = useState(true);
   const [liking, setLiking] = useState(false);
   const [reposting, setReposting] = useState(false);
+  const [bookmarking, setBookmarking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [hidden, setHidden] = useState(false);
   const [heartBurst, setHeartBurst] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
   const lastTapRef = useRef(0);
   const muteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const likingRef = useRef(false);
+  const watchSentRef = useRef(false);
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    if (isActive && !commentsOpen) {
+    el.playbackRate = playbackRate;
+    if (isActive && !commentsOpen && !shareOpen) {
       el.currentTime = 0;
       const play = el.play();
       if (play) play.catch(() => {});
     } else if (!isActive) {
       el.pause();
     }
-  }, [isActive, commentsOpen]);
+  }, [isActive, commentsOpen, shareOpen, playbackRate]);
 
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.muted = muted || !hasInteracted;
     }
   }, [muted, hasInteracted]);
+
+  useEffect(() => {
+    if (!isActive || !isLoggedIn || watchSentRef.current) return;
+    const t = setTimeout(() => {
+      if (watchSentRef.current) return;
+      watchSentRef.current = true;
+      fetch(`/api/videos/${video.id}/watch`, {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {
+        watchSentRef.current = false;
+      });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [isActive, isLoggedIn, video.id]);
 
   async function doLike(forceLike = false) {
     if (!isLoggedIn) {
@@ -94,15 +123,9 @@ export default function VideoCard({
           : likeCount + 1
     );
     try {
-      // If forceLike and already liked, skip API
       if (forceLike && prevLiked) {
         return;
       }
-      // If forceLike and not liked, or toggle: hit API
-      // For forceLike when not liked, we need to like. For toggle when liked, unlike.
-      // Problem: toggle API always toggles. So if we want forceLike and already liked, we skip.
-      // If forceLike and not liked, toggle will like — good.
-      // If not forceLike, toggle — good.
       const res = await fetch(`/api/videos/${video.id}/like`, {
         method: "POST",
         credentials: "include",
@@ -113,7 +136,6 @@ export default function VideoCard({
         setLikeCount(prevCount);
         return;
       }
-      // If forceLike requested like but API returned unliked (race), re-toggle
       if (forceLike && !data.liked) {
         const res2 = await fetch(`/api/videos/${video.id}/like`, {
           method: "POST",
@@ -183,21 +205,43 @@ export default function VideoCard({
     }
   }
 
-  async function handleShare(e: React.MouseEvent) {
-    e.stopPropagation();
-    const url = `${window.location.origin}/?v=${video.id}`;
+  async function toggleBookmark() {
+    if (!isLoggedIn) {
+      window.location.href = "/connexion";
+      return;
+    }
+    if (bookmarking) return;
+    setBookmarking(true);
+    const prev = bookmarked;
+    const prevCount = bookmarkCount;
+    const next = !bookmarked;
+    setBookmarked(next);
+    setBookmarkCount(next ? bookmarkCount + 1 : Math.max(0, bookmarkCount - 1));
     try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({
-          title: "ClipTok",
-          text: caption,
-          url,
-        });
+      const res = await fetch(`/api/videos/${video.id}/bookmark`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBookmarked(prev);
+        setBookmarkCount(prevCount);
+        setToast(data.error || "Erreur");
         return;
       }
+      setBookmarked(data.bookmarked);
+      setBookmarkCount(data.bookmarkCount);
+      setToast(data.bookmarked ? "Enregistré" : "Retiré des favoris");
     } catch {
-      // utilisateur a annulé ou share indisponible → fallback
+      setBookmarked(prev);
+      setBookmarkCount(prevCount);
+    } finally {
+      setBookmarking(false);
     }
+  }
+
+  async function copyLink() {
+    const url = `${window.location.origin}/?v=${video.id}`;
     try {
       await navigator.clipboard.writeText(url);
       setToast("Lien copié");
@@ -206,8 +250,35 @@ export default function VideoCard({
     }
   }
 
+  async function hideVideo() {
+    setHidden(true);
+    onHide?.(video.id);
+    if (isLoggedIn) {
+      try {
+        await fetch(`/api/videos/${video.id}/not-interested`, {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    setToast("Vidéo masquée");
+  }
+
+  async function reportVideo(reason: string) {
+    const res = await fetch(`/api/videos/${video.id}/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ reason }),
+    });
+    if (res.ok) setToast("Signalement envoyé");
+    else setToast("Impossible de signaler");
+  }
+
   function handleTap() {
-    if (commentsOpen) return;
+    if (commentsOpen || shareOpen) return;
     const now = Date.now();
     const delta = now - lastTapRef.current;
     lastTapRef.current = now;
@@ -217,14 +288,12 @@ export default function VideoCard({
         clearTimeout(muteTimerRef.current);
         muteTimerRef.current = null;
       }
-      // Double-tap → like + heart animation
       showHeartBurst();
       void doLike(true);
       onInteract();
       return;
     }
 
-    // Delay single-tap mute so a double-tap can cancel it
     if (muteTimerRef.current) clearTimeout(muteTimerRef.current);
     muteTimerRef.current = setTimeout(() => {
       muteTimerRef.current = null;
@@ -256,7 +325,6 @@ export default function VideoCard({
 
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/20" />
 
-      {/* Double-tap heart burst */}
       {heartBurst && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
           <Heart
@@ -274,8 +342,7 @@ export default function VideoCard({
         </div>
       )}
 
-      {/* Right actions */}
-      <div className="absolute right-3 bottom-28 md:bottom-24 flex flex-col items-center gap-4 z-20">
+      <div className="absolute right-3 bottom-28 md:bottom-24 flex flex-col items-center gap-3.5 z-20">
         <Link href={`/profil/${video.user.username}`} className="mb-1">
           <Avatar
             username={video.user.username}
@@ -297,7 +364,7 @@ export default function VideoCard({
               className={liked ? "fill-[#fe2c55] text-[#fe2c55]" : "text-white"}
             />
           </div>
-          <span className="text-xs font-semibold">{likeCount}</span>
+          <span className="text-xs font-semibold">{formatCount(likeCount)}</span>
         </button>
 
         <button
@@ -312,7 +379,30 @@ export default function VideoCard({
           <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur flex items-center justify-center group-active:scale-90 transition">
             <MessageCircle size={28} className="text-white" />
           </div>
-          <span className="text-xs font-semibold">{commentCount}</span>
+          <span className="text-xs font-semibold">{formatCount(commentCount)}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            void toggleBookmark();
+          }}
+          disabled={bookmarking}
+          className="flex flex-col items-center gap-1 group"
+          aria-label="Enregistrer"
+        >
+          <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur flex items-center justify-center group-active:scale-90 transition">
+            <Bookmark
+              size={26}
+              className={
+                bookmarked ? "fill-yellow-400 text-yellow-400" : "text-white"
+              }
+            />
+          </div>
+          <span className="text-xs font-semibold">
+            {bookmarkCount > 0 ? formatCount(bookmarkCount) : "Enreg."}
+          </span>
         </button>
 
         <button
@@ -328,13 +418,16 @@ export default function VideoCard({
             />
           </div>
           <span className="text-xs font-semibold">
-            {repostCount > 0 ? repostCount : "Republier"}
+            {repostCount > 0 ? formatCount(repostCount) : "Republier"}
           </span>
         </button>
 
         <button
           type="button"
-          onClick={handleShare}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShareOpen(true);
+          }}
           className="flex flex-col items-center gap-1 group"
           aria-label="Partager"
         >
@@ -348,6 +441,7 @@ export default function VideoCard({
           <VideoOwnerMenu
             videoId={video.id}
             caption={caption}
+            pinned={video.pinned}
             onCaptionUpdated={setCaption}
             onDeleted={() => {
               setHidden(true);
@@ -357,7 +451,6 @@ export default function VideoCard({
         )}
       </div>
 
-      {/* Bottom caption + music */}
       <div className="absolute left-0 right-16 bottom-16 md:bottom-20 px-4 z-20 pointer-events-none">
         {video.repost && (
           <p className="text-xs text-white/60 mb-1 flex items-center gap-1 pointer-events-auto">
@@ -387,9 +480,12 @@ export default function VideoCard({
         <p className="mt-2 flex items-center gap-1.5 text-xs text-white/70 truncate">
           <Music2 size={12} className="shrink-0 opacity-80" />
           <span className="truncate">
-            Son original — @{video.user.username}
+            {soundLabel(video.soundName, video.user.username)}
           </span>
         </p>
+        {playbackRate !== 1 && (
+          <p className="mt-1 text-[11px] text-white/50">{playbackRate}×</p>
+        )}
       </div>
 
       <button
@@ -409,11 +505,27 @@ export default function VideoCard({
         isLoggedIn={isLoggedIn}
       />
 
+      <ShareSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        caption={caption}
+        isLoggedIn={isLoggedIn}
+        bookmarked={bookmarked}
+        playbackRate={playbackRate}
+        onCopyLink={copyLink}
+        onToggleBookmark={toggleBookmark}
+        onNotInterested={hideVideo}
+        onReport={reportVideo}
+        onPlaybackRate={setPlaybackRate}
+      />
+
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
-      <style dangerouslySetInnerHTML={{
-        __html: `@keyframes cliptok-heart-pop{0%{transform:scale(.3);opacity:0}40%{transform:scale(1.15);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(1.4);opacity:0}}`,
-      }} />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `@keyframes cliptok-heart-pop{0%{transform:scale(.3);opacity:0}40%{transform:scale(1.15);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(1.4);opacity:0}}`,
+        }}
+      />
     </div>
   );
 }

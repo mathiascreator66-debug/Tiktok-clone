@@ -102,7 +102,9 @@ Voir `.env.example` :
 | `/amis` | Suivis + suggestions |
 | `/messages` | Inbox DM |
 | `/messages/[username]` | Fil de discussion |
-| `/telecharger` | Publier |
+| `/telecharger` | Studio — Publier / Story |
+| `/recherche` | Recherche comptes + vidéos |
+| `/historique` | Historique de visionnage |
 | `/profil/[username]` | Profil |
 | `/profil/[username]/modifier` | Éditer le profil |
 | `/parametres` | Paramètres et confidentialité |
@@ -128,7 +130,7 @@ Voir `.env.example` :
 
 - Pas de live, Duets, algo ML, notifications push
 - Vidéos démo en paysage — le lecteur utilise `object-cover`
-- Upload limité à 50 Mo, stockage local uniquement
+- Upload limité à 100 Mo (104 857 600 octets), stockage local uniquement
 - Pas de pagination du fil
 - Avatar = URL externe uniquement
 - Google OAuth optionnel

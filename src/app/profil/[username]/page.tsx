@@ -16,10 +16,14 @@ export default async function ProfilPage({
     where: { username: params.username.toLowerCase() },
     include: {
       videos: {
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ pinnedAt: "desc" }, { createdAt: "desc" }],
         include: {
           _count: { select: { likes: true, comments: true, reposts: true } },
         },
+      },
+      profileLinks: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, url: true, label: true },
       },
       _count: {
         select: {
@@ -101,6 +105,7 @@ export default async function ProfilPage({
         followerCount={user._count.followers}
         likeCount={likeAgg}
         hasActiveStories={activeStoryCount > 0}
+        links={user.profileLinks}
       />
 
       <ProfileTabs
@@ -110,6 +115,7 @@ export default async function ProfilPage({
           videoUrl: v.videoUrl,
           likeCount: v._count.likes,
           commentCount: v._count.comments,
+          pinned: Boolean(v.pinnedAt),
         }))}
         likedVideos={likedVideos}
         isOwner={isMe}

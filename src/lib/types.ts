@@ -2,13 +2,17 @@ export type FeedVideo = {
   id: string;
   caption: string;
   videoUrl: string;
+  soundName: string | null;
   createdAt: string;
   likeCount: number;
   commentCount: number;
   repostCount: number;
+  bookmarkCount: number;
   likedByMe: boolean;
   repostedByMe: boolean;
+  bookmarkedByMe: boolean;
   isOwner: boolean;
+  pinned: boolean;
   user: {
     id: string;
     username: string;
@@ -62,4 +66,10 @@ export type StoryGroup = {
   };
   stories: StoryItem[];
   hasUnviewed: boolean;
+};
+
+export type ProfileLinkItem = {
+  id?: string;
+  url: string;
+  label: string | null;
 };
