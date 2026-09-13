@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Heart, Search, Users } from "lucide-react";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 import { formatCount } from "@/lib/format";
 
 type UserHit = {
@@ -15,6 +16,7 @@ type UserHit = {
   bio: string | null;
   followerCount: number;
   videoCount: number;
+  isVerified?: boolean;
 };
 
 type VideoHit = {
@@ -121,8 +123,9 @@ export default function SearchPage() {
                     size={44}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm truncate">
-                      {u.displayName || u.username}
+                    <p className="font-semibold text-sm truncate inline-flex items-center gap-1 max-w-full">
+                      <span className="truncate">{u.displayName || u.username}</span>
+                      {u.isVerified && <VerifiedBadge size={15} />}
                     </p>
                     <p className="text-xs text-white/45 truncate">
                       @{u.username} · {formatCount(u.followerCount)} followers

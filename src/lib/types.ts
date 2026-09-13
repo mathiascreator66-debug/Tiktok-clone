@@ -49,6 +49,7 @@ export type CommentUser = {
   id: string;
   username: string;
   avatarUrl: string | null;
+  isVerified?: boolean;
 };
 
 export type CommentItem = {

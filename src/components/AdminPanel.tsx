@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Shield } from "lucide-react";
 import BrandLogo from "./BrandLogo";
+import VerifiedBadge from "./VerifiedBadge";
 
 type UserRow = {
   id: string;
@@ -179,10 +180,13 @@ export default function AdminPanel({
               className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">@{u.username}</span>
+                <span className="font-semibold inline-flex items-center gap-1">
+                  @{u.username}
+                  {u.isVerified && <VerifiedBadge size={14} />}
+                </span>
                 {u.isVerified && (
                   <span className="text-[10px] bg-sky-500/30 text-sky-200 px-1.5 rounded">
-                    vérifié
+                    Compte certifié
                   </span>
                 )}
                 {u.isAdmin && (
@@ -221,7 +225,7 @@ export default function AdminPanel({
                     <Btn onClick={() => userAction(u.id, "unban")}>Réactiver</Btn>
                   )}
                   <Btn onClick={() => userAction(u.id, "verify", { value: !u.isVerified })}>
-                    {u.isVerified ? "Retirer badge" : "Badge vérifié"}
+                    {u.isVerified ? "Retirer certification" : "Compte certifié"}
                   </Btn>
                   {!u.isModerator && !u.isAdmin && (
                     <Btn onClick={() => userAction(u.id, "make_moderator")}>

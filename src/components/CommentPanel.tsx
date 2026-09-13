@@ -18,6 +18,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 import type { CommentItem } from "@/lib/types";
 import { formatRelativeFr } from "@/lib/time";
 import { LinkifiedText } from "@/lib/linkify";
@@ -382,9 +383,10 @@ export default function CommentPanel({
                   <Link
                     href={`/profil/${c.user.username}`}
                     onClick={onClose}
-                    className="text-xs font-semibold text-white/80 hover:underline"
+                    className="text-xs font-semibold text-white/80 hover:underline inline-flex items-center gap-1"
                   >
                     @{c.user.username}
+                    {c.user.isVerified && <VerifiedBadge size={13} />}
                   </Link>
                   <span className="text-[10px] text-white/35">
                     {formatRelativeFr(c.createdAt)}

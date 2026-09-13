@@ -16,7 +16,7 @@ type DbComment = {
   createdAt: Date;
   parentId: string | null;
   imageUrl: string | null;
-  user: { id: string; username: string; avatarUrl: string | null };
+  user: { id: string; username: string; avatarUrl: string | null; isVerified?: boolean };
   _count: { likes: number };
   likes: { id: string }[];
 };
@@ -62,7 +62,7 @@ export async function GET(
     const comments = await prisma.comment.findMany({
       where: { videoId: params.id },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
+        user: { select: { id: true, username: true, avatarUrl: true, isVerified: true } },
         _count: { select: { likes: true } },
         likes: session
           ? { where: { userId: session.id }, select: { id: true } }
@@ -215,7 +215,7 @@ export async function POST(
         parentId: resolvedParentId,
       },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
+        user: { select: { id: true, username: true, avatarUrl: true, isVerified: true } },
         _count: { select: { likes: true } },
       },
     });

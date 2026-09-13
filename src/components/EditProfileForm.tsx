@@ -193,12 +193,35 @@ export default function EditProfileForm({ user }: { user: User }) {
 
       <div>
         <label className="block text-sm text-white/60 mb-1.5">
-          Liens (max {MAX_PROFILE_LINKS})
+          Lien du profil (max {MAX_PROFILE_LINKS})
         </label>
-        <div className="space-y-2">
+        <p className="text-[11px] text-white/35 mb-2">
+          Les visiteurs voient uniquement le texte affiché (ex. « Contactez-moi »),
+          pas l&apos;URL.
+        </p>
+        <div className="space-y-3">
           {links.map((link, i) => (
             <div key={i} className="flex gap-2">
-              <div className="flex-1 space-y-1.5">
+              <div className="flex-1 space-y-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <label className="block text-[11px] text-white/45 mb-1">
+                  Texte affiché
+                </label>
+                <input
+                  value={link.label}
+                  onChange={(e) =>
+                    setLinks((prev) =>
+                      prev.map((x, j) =>
+                        j === i ? { ...x, label: e.target.value } : x
+                      )
+                    )
+                  }
+                  placeholder="Ex. Contactez-moi"
+                  maxLength={40}
+                  className="w-full bg-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-[#fe2c55]"
+                />
+                <label className="block text-[11px] text-white/45 mb-1 mt-2">
+                  Adresse du lien
+                </label>
                 <input
                   type="url"
                   value={link.url}
@@ -209,21 +232,8 @@ export default function EditProfileForm({ user }: { user: User }) {
                       )
                     )
                   }
-                  placeholder="https://…"
+                  placeholder="https://wa.link/…"
                   className="w-full bg-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#fe2c55]"
-                />
-                <input
-                  value={link.label}
-                  onChange={(e) =>
-                    setLinks((prev) =>
-                      prev.map((x, j) =>
-                        j === i ? { ...x, label: e.target.value } : x
-                      )
-                    )
-                  }
-                  placeholder="Libellé (optionnel)"
-                  maxLength={40}
-                  className="w-full bg-white/10 rounded-xl px-4 py-2 text-xs outline-none focus:ring-1 focus:ring-[#fe2c55]"
                 />
               </div>
               <button

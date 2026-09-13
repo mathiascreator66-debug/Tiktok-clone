@@ -14,6 +14,7 @@ import {
   Gift,
 } from "lucide-react";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 import CommentPanel from "./CommentPanel";
 import Toast from "./Toast";
 import VideoOwnerMenu from "./VideoOwnerMenu";
@@ -683,7 +684,7 @@ export default function VideoCard({
         >
           @{video.user.username}
           {video.user.isVerified && (
-            <span className="inline-block ml-1 text-[#25f4ee] text-xs" title="Vérifié">✓</span>
+            <VerifiedBadge size={15} className="ml-1 align-middle inline-flex" />
           )}
           {video.user.displayName &&
             video.user.displayName !== video.user.username && (

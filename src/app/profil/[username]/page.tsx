@@ -108,6 +108,7 @@ export default async function ProfilPage({
         followerCount={user._count.followers}
         likeCount={likeAgg}
         isPro={isProActive(user)}
+        isVerified={user.isVerified}
         hasActiveStories={activeStoryCount > 0}
         links={user.profileLinks}
       />

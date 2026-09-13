@@ -12,6 +12,13 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
+    // Users cannot self-verify or elevate privileges
+    if ("isVerified" in body || "isAdmin" in body || "isModerator" in body) {
+      return NextResponse.json(
+        { error: "Modification non autorisée." },
+        { status: 403 }
+      );
+    }
     const data: {
       bio?: string | null;
       displayName?: string | null;

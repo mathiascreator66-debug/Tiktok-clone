@@ -114,6 +114,7 @@ async function main() {
       bio: "Compte démo AfriVoix 🎬 — fil, stories, DMs, solde démo et monétisation. Bio jusqu’à 250 caractères.",
       displayName: "Démo",
       balanceCents: 1000,
+      isVerified: true,
     },
     create: {
       email: "demo@afrivoix.local",
@@ -122,6 +123,7 @@ async function main() {
       bio: "Compte démo AfriVoix 🎬 — fil, stories, DMs, solde démo et monétisation. Bio jusqu’à 250 caractères.",
       displayName: "Démo",
       balanceCents: 1000,
+      isVerified: true,
     },
   });
 
@@ -131,6 +133,7 @@ async function main() {
       bio: "Créatrice de contenus · voyage & lifestyle. Liens dans la bio ✨",
       displayName: "Alice",
       balanceCents: 500,
+      isVerified: true,
     },
     create: {
       email: "alice@afrivoix.local",
@@ -139,6 +142,7 @@ async function main() {
       bio: "Créatrice de contenus · voyage & lifestyle. Liens dans la bio ✨",
       displayName: "Alice",
       balanceCents: 500,
+      isVerified: true,
     },
   });
 
@@ -260,15 +264,9 @@ async function main() {
     data: [
       {
         userId: demo.id,
-        url: "https://github.com",
-        label: "GitHub",
+        url: "https://wa.link/prfl27",
+        label: "Contactez-moi",
         sortOrder: 0,
-      },
-      {
-        userId: demo.id,
-        url: "https://afrivoix.local",
-        label: "AfriVoix",
-        sortOrder: 1,
       },
       {
         userId: alice.id,

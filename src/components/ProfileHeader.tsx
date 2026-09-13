@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Gift, Flag, Link as LinkIcon, Menu, Pencil, UserPlus, Sparkles } from "lucide-react";
 import type { ProfileLinkItem } from "@/lib/types";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 import FollowButton from "./FollowButton";
 import SettingsDrawer from "./SettingsDrawer";
 import TipSheet from "./TipSheet";
@@ -24,6 +25,7 @@ type Props = {
   followerCount: number;
   likeCount: number;
   isPro?: boolean;
+  isVerified?: boolean;
   /** Server hint — client also refetches for freshness */
   hasActiveStories?: boolean;
   links?: ProfileLinkItem[];
@@ -41,6 +43,7 @@ export default function ProfileHeader({
   followerCount: fr,
   likeCount,
   isPro = false,
+  isVerified = false,
   hasActiveStories = false,
   links = [],
 }: Props) {
@@ -159,6 +162,7 @@ export default function ProfileHeader({
 
         <div className="flex items-center gap-2 mt-3">
           <h1 className="text-xl font-bold">{displayName}</h1>
+          {isVerified && <VerifiedBadge size={20} />}
           {isPro && (
             <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase bg-amber-400 text-black px-1.5 py-0.5 rounded-full">
               <Sparkles size={10} /> Pro
@@ -195,12 +199,13 @@ export default function ProfileHeader({
         {links.length > 0 && (
           <div className="flex flex-wrap justify-center gap-2 mt-3 px-2">
             {links.map((l, i) => {
-              let host = l.label;
-              if (!host) {
+              // Visitors see label only; never the raw URL (hostname fallback).
+              let chip = (l.label || "").trim();
+              if (!chip) {
                 try {
-                  host = new URL(l.url).hostname.replace(/^www\./, "");
+                  chip = new URL(l.url).hostname.replace(/^www\./, "");
                 } catch {
-                  host = l.url;
+                  chip = "Lien";
                 }
               }
               return (
@@ -209,10 +214,11 @@ export default function ProfileHeader({
                   href={l.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/15 text-xs font-medium text-[#25f4ee]"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs font-semibold text-[#25f4ee]"
+                  title={chip}
                 >
-                  <LinkIcon size={11} />
-                  {host}
+                  <LinkIcon size={12} />
+                  {chip}
                 </a>
               );
             })}
