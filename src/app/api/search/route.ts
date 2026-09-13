@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
           displayName: true,
           avatarUrl: true,
           bio: true,
-          isVerified: true,
+          isVerified: true, isPro: true,
           _count: { select: { followers: true, videos: true } },
         },
         orderBy: { createdAt: "desc" },

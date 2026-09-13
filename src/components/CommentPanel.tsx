@@ -386,7 +386,7 @@ export default function CommentPanel({
                     className="text-xs font-semibold text-white/80 hover:underline inline-flex items-center gap-1"
                   >
                     @{c.user.username}
-                    {c.user.isVerified && <VerifiedBadge size={13} />}
+                    {(c.user.isVerified || c.user.isPro) && <VerifiedBadge size={13} />}
                   </Link>
                   <span className="text-[10px] text-white/35">
                     {formatRelativeFr(c.createdAt)}

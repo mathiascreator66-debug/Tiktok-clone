@@ -766,7 +766,7 @@ export default function VideoCard({
           className="font-bold text-base pointer-events-auto hover:underline"
         >
           @{video.user.username}
-          {video.user.isVerified && (
+          {(video.user.isVerified || video.user.isPro) && (
             <VerifiedBadge size={15} className="ml-1 align-middle inline-flex" />
           )}
           {video.user.displayName &&

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Gift, Flag, Link as LinkIcon, Menu, Pencil, UserPlus, Sparkles, BarChart3 } from "lucide-react";
+import { Gift, Flag, Link as LinkIcon, Menu, Pencil, UserPlus, BarChart3 } from "lucide-react";
 import type { ProfileLinkItem } from "@/lib/types";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
@@ -162,11 +162,7 @@ export default function ProfileHeader({
 
         <div className="flex items-center gap-2 mt-3">
           <h1 className="text-xl font-bold">{displayName}</h1>
-          {isPro && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase bg-amber-400 text-black px-1.5 py-0.5 rounded-full">
-              <Sparkles size={10} /> Pro
-            </span>
-          )}
+          {(isVerified || isPro) && <VerifiedBadge size={18} />}
           {isMe && (
             <Link
               href={`/profil/${username}/modifier`}
@@ -177,10 +173,7 @@ export default function ProfileHeader({
             </Link>
           )}
         </div>
-        <p className="text-white/50 text-sm inline-flex items-center gap-1.5">
-          <span>@{username}</span>
-          {isVerified && <VerifiedBadge size={15} />}
-        </p>
+        <p className="text-white/50 text-sm">@{username}</p>
 
         <div className="flex gap-8 mt-4">
           <Stat value={followingCount} label="Suivis" />

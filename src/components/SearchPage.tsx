@@ -125,7 +125,7 @@ export default function SearchPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-sm truncate inline-flex items-center gap-1 max-w-full">
                       <span className="truncate">{u.displayName || u.username}</span>
-                      {u.isVerified && <VerifiedBadge size={15} />}
+                      {(u.isVerified || u.isPro) && <VerifiedBadge size={15} />}
                     </p>
                     <p className="text-xs text-white/45 truncate">
                       @{u.username} · {formatCount(u.followerCount)} followers
