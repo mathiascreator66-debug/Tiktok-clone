@@ -19,7 +19,7 @@ import {
 } from "@/lib/limits";
 import { parseClientDuration, resolveDurationSeconds } from "@/lib/duration";
 import { safeError } from "@/lib/safe-log";
-import { parseGain, parseTrimMs } from "@/lib/media-edit";
+import { parseGain, normalizeStoredGain, parseTrimMs } from "@/lib/media-edit";
 
 const MAX_BYTES = MAX_UPLOAD_BYTES;
 const ALLOWED = new Set([
@@ -103,8 +103,8 @@ export async function GET() {
         caption: s.caption,
         soundName: s.soundName,
         soundUrl: s.soundUrl,
-        originalVolume: s.originalVolume ?? 1,
-        soundVolume: s.soundVolume ?? 1,
+        originalVolume: normalizeStoredGain(s.originalVolume ?? 1),
+        soundVolume: normalizeStoredGain(s.soundVolume ?? 1),
         soundTrimStartMs: s.soundTrimStartMs ?? 0,
         soundTrimEndMs: s.soundTrimEndMs ?? null,
         createdAt: s.createdAt.toISOString(),

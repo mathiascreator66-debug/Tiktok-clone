@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { SendHorizontal, X } from "lucide-react";
 import Avatar from "./Avatar";
 import type { StoryGroup } from "@/lib/types";
-import { elementVolumeFromGain } from "@/lib/media-edit";
+import { applyMediaGain } from "@/lib/media-edit";
 import { STORY_COMMENT_MAX, STORY_QUICK_EMOJIS } from "@/lib/limits";
 import { LinkifiedText } from "@/lib/linkify";
 import Link from "next/link";
@@ -194,7 +194,7 @@ export default function StoryViewer({
         const trimStart = (story.soundTrimStartMs || 0) / 1000;
         const trimEnd =
           story.soundTrimEndMs != null ? story.soundTrimEndMs / 1000 : null;
-        audioEl.volume = elementVolumeFromGain(story.soundVolume ?? 1);
+        applyMediaGain(audioEl, story.soundVolume ?? 1);
         audioEl.currentTime = trimStart;
         audioEl.play().catch(() => {});
         if (trimEnd != null && trimEnd > trimStart) {
@@ -227,7 +227,7 @@ export default function StoryViewer({
       if (el) {
         el.currentTime = 0;
         el.muted = false;
-        el.volume = elementVolumeFromGain(story.originalVolume ?? 1);
+        applyMediaGain(el, story.originalVolume ?? 1);
         // Prefer unmuted; browsers may block — fall back muted silently.
         el.play().catch(() => {
           el.muted = true;
@@ -278,11 +278,11 @@ export default function StoryViewer({
     }
     const vel = videoRef.current;
     if (vel) {
-      vel.volume = elementVolumeFromGain(story?.originalVolume ?? 1);
+      applyMediaGain(vel, story?.originalVolume ?? 1);
       vel.play().catch(() => {});
     }
     if (story?.soundUrl && audioRef.current) {
-      audioRef.current.volume = elementVolumeFromGain(story.soundVolume ?? 1);
+      applyMediaGain(audioRef.current, story.soundVolume ?? 1);
       audioRef.current.play().catch(() => {});
     }
   }

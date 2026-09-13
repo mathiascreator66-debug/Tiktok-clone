@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, ImagePlus, Music2, X, Camera, Images } from "lucide-react";
 import {
@@ -13,6 +13,7 @@ import {
   formatBytesFr,
 } from "@/lib/limits";
 import { uploadFormData } from "@/lib/upload-client";
+import { applyMediaGain } from "@/lib/media-edit";
 import AudioTrimControls from "./AudioTrimControls";
 import CameraCapture, { type CameraResult } from "./CameraCapture";
 
@@ -20,6 +21,8 @@ export default function StoryUploadForm() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLInputElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const galleryAudioRef = useRef<HTMLAudioElement>(null);
   const [caption, setCaption] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -36,9 +39,37 @@ export default function StoryUploadForm() {
   const [durationSec, setDurationSec] = useState<number | null>(null);
   const [source, setSource] = useState<"gallery" | "camera">("gallery");
   const [showCamera, setShowCamera] = useState(false);
+  const [previewUnlocked, setPreviewUnlocked] = useState(false);
+
+  useEffect(() => {
+    applyMediaGain(previewVideoRef.current, originalVolume);
+  }, [originalVolume, preview, isVideo]);
+
+  useEffect(() => {
+    const a = galleryAudioRef.current;
+    if (!a) return;
+    if (!audioFile) {
+      a.pause();
+      a.removeAttribute("src");
+      a.load();
+      return;
+    }
+    const url = URL.createObjectURL(audioFile);
+    a.src = url;
+    applyMediaGain(a, soundVolume);
+    return () => URL.revokeObjectURL(url);
+    // soundVolume applied in separate effect — avoid recreating object URL on every drag
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioFile]);
+
+  useEffect(() => {
+    applyMediaGain(galleryAudioRef.current, soundVolume);
+  }, [soundVolume]);
+
 
   function applyCaptured(f: File, url: string) {
     if (preview) URL.revokeObjectURL(preview);
+    setPreviewUnlocked(false);
     setFile(f);
     const isVid = f.type.startsWith("video/");
     setIsVideo(isVid);
@@ -156,6 +187,8 @@ export default function StoryUploadForm() {
 
   return (
     <form onSubmit={submit} className="w-full max-w-md mx-auto space-y-5">
+      {/* Always mounted so gallery music volume works for photo stories */}
+      <audio ref={galleryAudioRef} preload="auto" className="hidden" aria-hidden />
       <div className="flex gap-2 p-1 rounded-full bg-white/5">
         <button
           type="button"
@@ -199,19 +232,38 @@ export default function StoryUploadForm() {
         />
       ) : (
       <div
-        onClick={() => fileRef.current?.click()}
+        onClick={() => {
+          if (!preview) fileRef.current?.click();
+        }}
         className="relative aspect-[9/16] max-h-[50vh] rounded-2xl border-2 border-dashed border-white/20 bg-white/5 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#25f4ee]/50 transition"
       >
         {preview ? (
           isVideo ? (
-            <video
-              src={preview}
-              className="absolute inset-0 w-full h-full object-cover"
-              muted
-              loop
-              autoPlay
-              playsInline
-            />
+            <>
+              <video
+                ref={previewVideoRef}
+                src={preview}
+                className="absolute inset-0 w-full h-full object-cover"
+                loop
+                autoPlay
+                playsInline
+                muted={!previewUnlocked || originalVolume <= 0}
+                onLoadedData={() => {
+                  applyMediaGain(previewVideoRef.current, originalVolume);
+                }}
+                onPlay={() => {
+                  applyMediaGain(previewVideoRef.current, originalVolume);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const el = previewVideoRef.current;
+                  if (!el) return;
+                  setPreviewUnlocked(true);
+                    applyMediaGain(el, originalVolume, { unmute: true });
+                    void el.play().catch(() => {});
+                }}
+              />
+            </>
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -280,10 +332,19 @@ export default function StoryUploadForm() {
               max={100}
               step={1}
               value={Math.round(originalVolume * 100)}
-              onChange={(e) => setOriginalVolume(Number(e.target.value) / 100)}
+              onChange={(e) => {
+                const v = Number(e.target.value) / 100;
+                setOriginalVolume(v);
+                setPreviewUnlocked(true);
+                applyMediaGain(previewVideoRef.current, v, { unmute: true });
+                void previewVideoRef.current?.play().catch(() => {});
+              }}
               className="w-full accent-[#25f4ee]"
               aria-label="Son original"
             />
+            <p className="text-[10px] text-white/30">
+              Déplacez pour entendre le volume tout de suite.
+            </p>
           </div>
         )}
         <label className="block text-sm text-white/60 mb-1.5">
@@ -331,11 +392,15 @@ export default function StoryUploadForm() {
             volume={soundVolume}
             trimStartSec={trimStartSec}
             trimEndSec={trimEndSec}
-            onVolumeChange={setSoundVolume}
+            onVolumeChange={(v) => {
+              setSoundVolume(v);
+              applyMediaGain(galleryAudioRef.current, v, { unmute: true });
+            }}
             onTrimChange={(s, e) => {
               setTrimStartSec(s);
               setTrimEndSec(e);
             }}
+            externalAudioRef={galleryAudioRef}
           />
         )}
       </div>

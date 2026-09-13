@@ -24,7 +24,7 @@ import { soundLabel } from "@/lib/sounds";
 import { formatCount } from "@/lib/format";
 import type { PlaybackRate } from "@/lib/limits";
 import { LinkifiedText } from "@/lib/linkify";
-import { elementVolumeFromGain } from "@/lib/media-edit";
+import { applyMediaGain } from "@/lib/media-edit";
 import VideoMediaOverlays from "./VideoMediaOverlays";
 
 type Props = {
@@ -88,7 +88,7 @@ export default function VideoCard({
     const el = videoRef.current;
     if (!el) return;
     el.playbackRate = playbackRate;
-    el.volume = elementVolumeFromGain(video.originalVolume ?? 1);
+    applyMediaGain(el, video.originalVolume ?? 1);
 
     if (isActive && !commentsOpen && !shareOpen && !tipOpen && !paused) {
       const start = videoTrimStartSec;
@@ -139,7 +139,7 @@ export default function VideoCard({
     if (!el) return;
     // Mix: never force-mute original just because gallery music is attached.
     el.muted = muted || needsSoundGesture;
-    el.volume = elementVolumeFromGain(video.originalVolume ?? 1);
+    applyMediaGain(el, video.originalVolume ?? 1);
   }, [muted, needsSoundGesture, video.originalVolume]);
 
   // Play attached gallery audio mixed with original; pause when inactive / muted
@@ -150,7 +150,7 @@ export default function VideoCard({
     const trimStart = (video.soundTrimStartMs || 0) / 1000;
     const trimEnd =
       video.soundTrimEndMs != null ? video.soundTrimEndMs / 1000 : null;
-    audio.volume = elementVolumeFromGain(video.soundVolume ?? 1);
+    applyMediaGain(audio, video.soundVolume ?? 1);
     const canHear = !muted && !needsSoundGesture;
     if (
       isActive &&
@@ -390,12 +390,12 @@ export default function VideoCard({
     const el = videoRef.current;
     if (el) {
       el.muted = false;
-      el.volume = elementVolumeFromGain(video.originalVolume ?? 1);
+      applyMediaGain(el, video.originalVolume ?? 1);
       el.play().catch(() => {});
     }
     const audio = audioRef.current;
     if (audio && video.soundUrl) {
-      audio.volume = elementVolumeFromGain(video.soundVolume ?? 1);
+      applyMediaGain(audio, video.soundVolume ?? 1);
       audio.play().catch(() => {});
     }
   }
@@ -493,7 +493,7 @@ export default function VideoCard({
         onPlay={() => {
           const a = audioRef.current;
           if (!a || !video.soundUrl || muted || needsSoundGesture) return;
-          a.volume = elementVolumeFromGain(video.soundVolume ?? 1);
+          applyMediaGain(a, video.soundVolume ?? 1);
           a.play().catch(() => {});
         }}
         onPause={() => {

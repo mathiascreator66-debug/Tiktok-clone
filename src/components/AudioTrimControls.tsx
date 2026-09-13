@@ -2,11 +2,13 @@
 
 /**
  * Volume (0–200%) + trim start/end for gallery audio.
+ * Live volume applies to preview <audio> (and GainNode when >100%).
  * Optional waveform via Web Audio API decode + canvas peaks (best-effort).
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { Play, Pause } from "lucide-react";
+import { applyMediaGain } from "@/lib/media-edit";
 
 type Props = {
   audioFile: File | null;
@@ -17,6 +19,8 @@ type Props = {
   trimEndSec: number | null;
   onVolumeChange: (v: number) => void;
   onTrimChange: (startSec: number, endSec: number | null) => void;
+  /** Optional external audio element to keep in sync (upload preview mix) */
+  externalAudioRef?: RefObject<HTMLAudioElement | null>;
 };
 
 function formatSec(s: number): string {
@@ -34,6 +38,7 @@ export default function AudioTrimControls({
   trimEndSec,
   onVolumeChange,
   onTrimChange,
+  externalAudioRef,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
@@ -53,6 +58,34 @@ export default function AudioTrimControls({
     setObjectUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [audioFile]);
+
+  // Ensure preview audio element exists whenever we have a src
+  useEffect(() => {
+    if (!src) return;
+    let a = audioElRef.current;
+    if (!a) {
+      a = new Audio();
+      a.preload = "auto";
+      audioElRef.current = a;
+    }
+    if (a.src !== src) {
+      a.src = src;
+    }
+    applyMediaGain(a, volume);
+    if (externalAudioRef?.current) {
+      const ext = externalAudioRef.current;
+      if (ext.src !== src) ext.src = src;
+      applyMediaGain(ext, volume);
+    }
+  }, [src, volume, externalAudioRef]);
+
+  // Live volume while playing / idle
+  useEffect(() => {
+    applyMediaGain(audioElRef.current, volume);
+    if (externalAudioRef?.current) {
+      applyMediaGain(externalAudioRef.current, volume);
+    }
+  }, [volume, externalAudioRef]);
 
   // Decode waveform peaks (best-effort; silent fail on CORS / decode errors)
   useEffect(() => {
@@ -100,7 +133,6 @@ export default function AudioTrimControls({
         }
         await ac.close().catch(() => {});
       } catch {
-        // Waveform optional
         if (!cancelled && ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.fillStyle = "rgba(255,255,255,0.15)";
@@ -134,16 +166,22 @@ export default function AudioTrimControls({
     };
   }, []);
 
-  function playPreview() {
-    if (!src) return;
-    if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+  function ensureAudio(): HTMLAudioElement | null {
+    if (!src) return null;
     let a = audioElRef.current;
     if (!a) {
       a = new Audio();
       audioElRef.current = a;
     }
-    a.src = src;
-    a.volume = Math.min(1, Math.max(0, volume));
+    if (a.src !== src) a.src = src;
+    return a;
+  }
+
+  function playPreview() {
+    const a = ensureAudio();
+    if (!a || !src) return;
+    if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+    applyMediaGain(a, volume, { unmute: true });
     const start = Math.max(0, trimStartSec);
     const end =
       trimEndSec != null && trimEndSec > start
@@ -157,7 +195,7 @@ export default function AudioTrimControls({
         setPlaying(true);
         const ms = Math.max(200, (end - start) * 1000);
         stopTimerRef.current = setTimeout(() => {
-          a!.pause();
+          a.pause();
           setPlaying(false);
         }, ms);
       })
@@ -168,6 +206,22 @@ export default function AudioTrimControls({
     if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
     audioElRef.current?.pause();
     setPlaying(false);
+  }
+
+  function handleVolumeChange(next: number) {
+    onVolumeChange(next);
+    const a = ensureAudio();
+    applyMediaGain(a, next, { unmute: true });
+    if (externalAudioRef?.current) {
+      applyMediaGain(externalAudioRef.current, next, { unmute: true });
+    }
+    // If preview is playing, volume change is live; if not, kick a short audible sample
+    // so the slider always has an audible test path without requiring a separate press.
+    if (a && a.paused) {
+      // no auto-play on every tick — user uses « Aperçu »; live apply covers playing case
+    } else if (a && !a.paused) {
+      applyMediaGain(a, next, { unmute: true });
+    }
   }
 
   const endVal =
@@ -182,7 +236,6 @@ export default function AudioTrimControls({
   return (
     <div className="mt-3 space-y-3 rounded-xl bg-white/5 border border-white/10 p-3">
       <p className="text-xs font-medium text-white/70">Son — volume & coupe</p>
-      {/* Label TikTok: « Son » = musique / audio galerie */}
 
       <div>
         <div className="flex justify-between text-[11px] text-white/45 mb-1">
@@ -195,10 +248,14 @@ export default function AudioTrimControls({
           max={200}
           step={1}
           value={Math.round(volume * 100)}
-          onChange={(e) => onVolumeChange(Number(e.target.value) / 100)}
+          onChange={(e) => handleVolumeChange(Number(e.target.value) / 100)}
           className="w-full accent-[#fe2c55]"
           aria-label="Son"
         />
+        <p className="text-[10px] text-white/30 mt-0.5">
+          0 % = silence · 50 % plus bas · jusqu&apos;à 200 % (boost). Changez
+          pendant l&apos;aperçu pour entendre.
+        </p>
       </div>
 
       <canvas

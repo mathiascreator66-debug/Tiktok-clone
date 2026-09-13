@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, Film, Images, Music2, X, Camera, Image as ImageIcon } from "lucide-react";
 import {
@@ -18,6 +18,7 @@ import { uploadFormData } from "@/lib/upload-client";
 import {
   serializeCaptions,
   serializeOverlays,
+  applyMediaGain,
   type CaptionCue,
   type TextOverlay,
 } from "@/lib/media-edit";
@@ -33,6 +34,8 @@ export default function UploadForm({ username }: { username: string }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLInputElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const galleryAudioRef = useRef<HTMLAudioElement>(null);
   const [caption, setCaption] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -55,9 +58,39 @@ export default function UploadForm({ username }: { username: string }) {
   const [durationSec, setDurationSec] = useState<number | null>(null);
   const [source, setSource] = useState<"gallery" | "camera">("gallery");
   const [showCamera, setShowCamera] = useState(false);
+  const [previewUnlocked, setPreviewUnlocked] = useState(false);
+
+  // Live preview: apply « Son original » to the preview video immediately
+  useEffect(() => {
+    applyMediaGain(previewVideoRef.current, originalVolume);
+  }, [originalVolume, preview]);
+
+  // Keep gallery music preview element in sync when file changes
+  useEffect(() => {
+    const a = galleryAudioRef.current;
+    if (!a) return;
+    if (!audioFile) {
+      a.pause();
+      a.removeAttribute("src");
+      a.load();
+      return;
+    }
+    const url = URL.createObjectURL(audioFile);
+    a.src = url;
+    applyMediaGain(a, soundVolume);
+    return () => URL.revokeObjectURL(url);
+    // soundVolume applied in separate effect — avoid recreating object URL on every drag
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioFile]);
+
+  useEffect(() => {
+    applyMediaGain(galleryAudioRef.current, soundVolume);
+  }, [soundVolume]);
+
 
   function applyMediaFile(f: File, url: string) {
     if (preview) URL.revokeObjectURL(preview);
+    setPreviewUnlocked(false);
     if (coverPreview) URL.revokeObjectURL(coverPreview);
     setFile(f);
     setPreview(url);
@@ -264,18 +297,40 @@ export default function UploadForm({ username }: { username: string }) {
         />
       ) : (
       <div
-        onClick={() => fileRef.current?.click()}
+        onClick={() => {
+          if (!preview) fileRef.current?.click();
+        }}
         className="relative aspect-[9/16] max-h-[46vh] rounded-2xl border-2 border-dashed border-white/20 bg-white/5 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#fe2c55]/50 transition"
       >
         {preview ? (
-          <video
-            src={preview}
-            className="absolute inset-0 w-full h-full object-cover"
-            muted
-            loop
-            autoPlay
-            playsInline
-          />
+          <>
+            <video
+              ref={previewVideoRef}
+              src={preview}
+              className="absolute inset-0 w-full h-full object-cover"
+              loop
+              autoPlay
+              playsInline
+              // Start muted for autoplay policy; slider gesture unmutes + sets volume
+              muted={!previewUnlocked || originalVolume <= 0}
+              onLoadedData={() => {
+                applyMediaGain(previewVideoRef.current, originalVolume);
+              }}
+              onPlay={() => {
+                applyMediaGain(previewVideoRef.current, originalVolume);
+              }}
+              onClick={(e) => {
+                // Keep preview clickable for play/unmute without reopening file picker
+                e.stopPropagation();
+                const el = previewVideoRef.current;
+                if (!el) return;
+                setPreviewUnlocked(true);
+                  applyMediaGain(el, originalVolume, { unmute: true });
+                  void el.play().catch(() => {});
+              }}
+            />
+            <audio ref={galleryAudioRef} preload="auto" className="hidden" />
+          </>
         ) : (
           <>
             <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mb-3">
@@ -395,12 +450,19 @@ export default function UploadForm({ username }: { username: string }) {
             max={100}
             step={1}
             value={Math.round(originalVolume * 100)}
-            onChange={(e) => setOriginalVolume(Number(e.target.value) / 100)}
+            onChange={(e) => {
+              const v = Number(e.target.value) / 100;
+              setOriginalVolume(v);
+              setPreviewUnlocked(true);
+              applyMediaGain(previewVideoRef.current, v, { unmute: true });
+              void previewVideoRef.current?.play().catch(() => {});
+            }}
             className="w-full accent-[#25f4ee]"
             aria-label="Son original"
           />
           <p className="text-[10px] text-white/30">
-            Volume de la piste audio de la vidéo (0–100 %).
+            Volume de la piste audio de la vidéo (0–100 %). Déplacez le curseur
+            pour entendre le changement tout de suite.
           </p>
         </div>
 
@@ -452,11 +514,15 @@ export default function UploadForm({ username }: { username: string }) {
             volume={soundVolume}
             trimStartSec={trimStartSec}
             trimEndSec={trimEndSec}
-            onVolumeChange={setSoundVolume}
+            onVolumeChange={(v) => {
+              setSoundVolume(v);
+              applyMediaGain(galleryAudioRef.current, v, { unmute: true });
+            }}
             onTrimChange={(s, e) => {
               setTrimStartSec(s);
               setTrimEndSec(e);
             }}
+            externalAudioRef={galleryAudioRef}
           />
         )}
 

@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import type { SessionUser } from "./auth";
 import type { FeedVideo } from "./types";
-import { parseOverlaysField, parseCaptionsField } from "./media-edit";
+import { parseOverlaysField, parseCaptionsField, normalizeStoredGain } from "./media-edit";
 
 type VideoWithRelations = {
   id: string;
@@ -50,8 +50,8 @@ function mapVideo(
     coverUrl: v.coverUrl ?? null,
     soundName: v.soundName,
     soundUrl: v.soundUrl ?? null,
-    originalVolume: typeof v.originalVolume === "number" ? v.originalVolume : 1,
-    soundVolume: typeof v.soundVolume === "number" ? v.soundVolume : 1,
+    originalVolume: normalizeStoredGain(v.originalVolume ?? 1),
+    soundVolume: normalizeStoredGain(v.soundVolume ?? 1),
     soundTrimStartMs: typeof v.soundTrimStartMs === "number" ? v.soundTrimStartMs : 0,
     soundTrimEndMs: v.soundTrimEndMs ?? null,
     videoTrimStartMs: typeof v.videoTrimStartMs === "number" ? v.videoTrimStartMs : 0,

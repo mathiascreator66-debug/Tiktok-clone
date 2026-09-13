@@ -1,3 +1,4 @@
+import { normalizeStoredGain } from "@/lib/media-edit";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
@@ -45,8 +46,8 @@ export async function GET(
         caption: s.caption,
         soundName: s.soundName,
         soundUrl: s.soundUrl,
-        originalVolume: s.originalVolume ?? 1,
-        soundVolume: s.soundVolume ?? 1,
+        originalVolume: normalizeStoredGain(s.originalVolume ?? 1),
+        soundVolume: normalizeStoredGain(s.soundVolume ?? 1),
         soundTrimStartMs: s.soundTrimStartMs ?? 0,
         soundTrimEndMs: s.soundTrimEndMs ?? null,
         createdAt: s.createdAt.toISOString(),
