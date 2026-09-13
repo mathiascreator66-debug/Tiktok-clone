@@ -498,144 +498,189 @@ export async function getVideoAnalytics(
   }
 
   if (tab === "viewers") {
-    const events = await prisma.watchEvent.findMany({
-      where: { videoId, watchedAt: { gte: start, lt: end } },
-      select: { userId: true, watchedAt: true },
-    });
-
-    const loggedInEvents = events.filter((e) => e.userId);
-    const anonCount = events.length - loggedInEvents.length;
-
-    // New vs returning: first-ever watch on this video before period start
-    const distinctIds = [...new Set(loggedInEvents.map((e) => e.userId!))];
-    let newViewers = 0;
-    let returningViewers = 0;
-    if (distinctIds.length) {
-      const prior = await prisma.watchEvent.findMany({
-        where: {
-          videoId,
-          userId: { in: distinctIds },
-          watchedAt: { lt: start },
-        },
-        select: { userId: true },
-        distinct: ["userId"],
+    try {
+      const events = await prisma.watchEvent.findMany({
+        where: { videoId, watchedAt: { gte: start, lt: end } },
+        select: { userId: true, watchedAt: true },
       });
-      const priorSet = new Set(prior.map((p) => p.userId!));
-      for (const id of distinctIds) {
-        if (priorSet.has(id)) returningViewers += 1;
-        else newViewers += 1;
+
+      const loggedInEvents = events.filter((e) => e.userId);
+      const anonCount = events.length - loggedInEvents.length;
+
+      const distinctIds = [
+        ...new Set(
+          loggedInEvents
+            .map((e) => e.userId)
+            .filter((id): id is string => Boolean(id))
+        ),
+      ];
+      let newViewers = 0;
+      let returningViewers = 0;
+      if (distinctIds.length) {
+        // Avoid Prisma distinct quirks: fetch prior userIds then unique in JS
+        const priorRows = await prisma.watchEvent.findMany({
+          where: {
+            videoId,
+            userId: { in: distinctIds },
+            watchedAt: { lt: start },
+          },
+          select: { userId: true },
+        });
+        const priorSet = new Set(
+          priorRows.map((p) => p.userId).filter((id): id is string => Boolean(id))
+        );
+        for (const id of distinctIds) {
+          if (priorSet.has(id)) returningViewers += 1;
+          else newViewers += 1;
+        }
       }
+
+      let followerViewers = 0;
+      let nonFollowerViewers = 0;
+      if (distinctIds.length) {
+        const follows = await prisma.follow.findMany({
+          where: {
+            followingId: video.userId,
+            followerId: { in: distinctIds },
+          },
+          select: { followerId: true },
+        });
+        const followSet = new Set(follows.map((f) => f.followerId));
+        for (const id of distinctIds) {
+          if (followSet.has(id)) followerViewers += 1;
+          else nonFollowerViewers += 1;
+        }
+      }
+
+      const users = distinctIds.length
+        ? await prisma.user.findMany({
+            where: { id: { in: distinctIds } },
+            select: { id: true, birthdate: true, country: true },
+          })
+        : [];
+
+      const ageBuckets: Record<string, number> = {
+        "18-24": 0,
+        "25-34": 0,
+        "35-44": 0,
+        "45-54": 0,
+        "55+": 0,
+        inconnu: 0,
+      };
+      const countryCounts = new Map<string, number>();
+      let withBirthdate = 0;
+      let withCountry = 0;
+      for (const u of users) {
+        if (u.birthdate) {
+          try {
+            const age = ageFromBirthdate(
+              u.birthdate instanceof Date ? u.birthdate : new Date(u.birthdate)
+            );
+            if (!Number.isFinite(age) || age < 0) {
+              ageBuckets.inconnu += 1;
+            } else {
+              withBirthdate += 1;
+              if (age < 25) ageBuckets["18-24"] += 1;
+              else if (age < 35) ageBuckets["25-34"] += 1;
+              else if (age < 45) ageBuckets["35-44"] += 1;
+              else if (age < 55) ageBuckets["45-54"] += 1;
+              else ageBuckets["55+"] += 1;
+            }
+          } catch {
+            ageBuckets.inconnu += 1;
+          }
+        } else {
+          ageBuckets.inconnu += 1;
+        }
+        if (u.country) {
+          withCountry += 1;
+          countryCounts.set(u.country, (countryCounts.get(u.country) ?? 0) + 1);
+        }
+      }
+
+      const denom = Math.max(users.length, 1);
+      const countries = [...countryCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([code, count]) => ({
+          code,
+          count,
+          pct: users.length > 0 ? Math.round((count / denom) * 1000) / 10 : 0,
+        }));
+
+      return {
+        header,
+        range,
+        tab,
+        viewers: {
+          totalWatches: events.length,
+          distinctLoggedIn: distinctIds.length,
+          anonymousWatches: anonCount,
+          limitedNote:
+            anonCount > 0 || distinctIds.length === 0
+              ? "Données limitées — démographie basée sur les comptes connectés uniquement. Pas de genre enregistré."
+              : "Données démographiques basées sur les spectateurs connectés. Le sexe n’est pas collecté.",
+          types: {
+            newViewers,
+            returningViewers,
+            followerViewers,
+            nonFollowerViewers,
+          },
+          gender: {
+            available: false,
+            note: "Données limitées — le sexe n’est pas enregistré sur AfriVoix.",
+          },
+          age: {
+            sampleSize: withBirthdate,
+            buckets: Object.entries(ageBuckets).map(([label, count]) => ({
+              label,
+              count,
+              pct:
+                users.length > 0
+                  ? Math.round((count / denom) * 1000) / 10
+                  : 0,
+            })),
+          },
+          locations: {
+            sampleSize: withCountry,
+            countries,
+            note:
+              withCountry === 0
+                ? "Données limitées — peu de profils renseignent le pays."
+                : null,
+          },
+        },
+      };
+    } catch (err) {
+      console.error("viewers tab error", err);
+      return {
+        header,
+        range,
+        tab,
+        viewers: {
+          totalWatches: 0,
+          distinctLoggedIn: 0,
+          anonymousWatches: 0,
+          limitedNote: "Données limitées — impossible d’agréger les spectateurs pour cette période.",
+          types: {
+            newViewers: 0,
+            returningViewers: 0,
+            followerViewers: 0,
+            nonFollowerViewers: 0,
+          },
+          gender: {
+            available: false,
+            note: "Données limitées — le sexe n’est pas enregistré sur AfriVoix.",
+          },
+          age: { sampleSize: 0, buckets: [] },
+          locations: {
+            sampleSize: 0,
+            countries: [],
+            note: "Données limitées",
+          },
+        },
+      };
     }
-
-    // Followers vs non-followers (current follow state — best-effort)
-    let followerViewers = 0;
-    let nonFollowerViewers = 0;
-    if (distinctIds.length) {
-      const follows = await prisma.follow.findMany({
-        where: {
-          followingId: video.userId,
-          followerId: { in: distinctIds },
-        },
-        select: { followerId: true },
-      });
-      const followSet = new Set(follows.map((f) => f.followerId));
-      for (const id of distinctIds) {
-        if (followSet.has(id)) followerViewers += 1;
-        else nonFollowerViewers += 1;
-      }
-    }
-
-    const users = distinctIds.length
-      ? await prisma.user.findMany({
-          where: { id: { in: distinctIds } },
-          select: { id: true, birthdate: true, country: true },
-        })
-      : [];
-
-    const ageBuckets: Record<string, number> = {
-      "18-24": 0,
-      "25-34": 0,
-      "35-44": 0,
-      "45-54": 0,
-      "55+": 0,
-      inconnu: 0,
-    };
-    const countryCounts = new Map<string, number>();
-    let withBirthdate = 0;
-    let withCountry = 0;
-    for (const u of users) {
-      if (u.birthdate) {
-        withBirthdate += 1;
-        const age = ageFromBirthdate(u.birthdate);
-        if (age < 25) ageBuckets["18-24"] += 1;
-        else if (age < 35) ageBuckets["25-34"] += 1;
-        else if (age < 45) ageBuckets["35-44"] += 1;
-        else if (age < 55) ageBuckets["45-54"] += 1;
-        else ageBuckets["55+"] += 1;
-      } else {
-        ageBuckets.inconnu += 1;
-      }
-      if (u.country) {
-        withCountry += 1;
-        countryCounts.set(u.country, (countryCounts.get(u.country) ?? 0) + 1);
-      }
-    }
-
-    const countries = [...countryCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([code, count]) => ({
-        code,
-        count,
-        pct:
-          users.length > 0
-            ? Math.round((count / users.length) * 1000) / 10
-            : 0,
-      }));
-
-    return {
-      header,
-      range,
-      tab,
-      viewers: {
-        totalWatches: events.length,
-        distinctLoggedIn: distinctIds.length,
-        anonymousWatches: anonCount,
-        limitedNote:
-          anonCount > 0 || distinctIds.length === 0
-            ? "Données limitées — démographie basée sur les comptes connectés uniquement. Pas de genre enregistré."
-            : "Données démographiques basées sur les spectateurs connectés. Le sexe n’est pas collecté.",
-        types: {
-          newViewers,
-          returningViewers,
-          followerViewers,
-          nonFollowerViewers,
-        },
-        gender: {
-          available: false,
-          note: "Données limitées — le sexe n’est pas enregistré sur AfriVoix.",
-        },
-        age: {
-          sampleSize: withBirthdate,
-          buckets: Object.entries(ageBuckets).map(([label, count]) => ({
-            label,
-            count,
-            pct:
-              users.length > 0
-                ? Math.round((count / users.length) * 1000) / 10
-                : 0,
-          })),
-        },
-        locations: {
-          sampleSize: withCountry,
-          countries,
-          note:
-            withCountry === 0
-              ? "Données limitées — peu de profils renseignent le pays."
-              : null,
-        },
-      },
-    };
   }
 
   // engagement

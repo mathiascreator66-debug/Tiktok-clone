@@ -353,7 +353,7 @@ export default function StoryViewer({
 
   const ui = (
     <div
-      className="fixed inset-0 z-[110] bg-black flex flex-col"
+      className="force-dark fixed inset-0 z-[110] bg-black flex flex-col"
       onTouchMove={(e) => e.stopPropagation()}
       role="dialog"
       aria-modal="true"

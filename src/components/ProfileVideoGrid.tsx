@@ -42,7 +42,7 @@ export default function ProfileVideoGrid({
           className="relative aspect-[9/16] bg-white/5 rounded overflow-hidden group"
         >
           {v.pinned && (
-            <span className="absolute top-1 left-1 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-semibold">
+            <span className="absolute top-1 left-1 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#fe2c55] text-white text-[10px] font-semibold shadow">
               <Pin size={9} /> Épinglé
             </span>
           )}

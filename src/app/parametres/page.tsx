@@ -15,9 +15,10 @@ import {
   Info,
   HelpCircle,
   FileText,
-  BarChart3,
-} from "lucide-react";
+  BarChart3, UserX } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import DataSaverToggle from "@/components/DataSaverToggle";
+import ThemeToggle from "@/components/ThemeToggle";
 import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +67,12 @@ export default async function ParametresPage() {
           label="Ajouter une story"
         />
       </Section>
+      <Section title="Apparence">
+        <ThemeToggle />
+      </Section>
+      <Section title="Données">
+        <div className="px-3 mb-2"><DataSaverToggle /></div>
+      </Section>
 
 
       <Section title="Monétisation">
@@ -100,6 +107,7 @@ export default async function ParametresPage() {
 
       <Section title="Aide et légal">
         <LinkItem href="/a-propos" icon={<Info size={20} />} label="À propos d'AfriVoix" />
+        <LinkItem href="/parametres/bloques" icon={<UserX size={20} />} label="Comptes bloqués" />
         <LinkItem href="/aide" icon={<HelpCircle size={20} />} label="Centre d'aide" />
         <LinkItem href="/cgu" icon={<FileText size={20} />} label="Conditions d'utilisation" />
         <LinkItem href="/confidentialite" icon={<FileText size={20} />} label="Confidentialité" />

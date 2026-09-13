@@ -26,7 +26,14 @@ export async function PATCH(req: NextRequest) {
       avatarUrl?: string | null;
       phoneE164?: string | null;
       phoneCountry?: string | null;
+      theme?: string;
+      language?: string;
     } = {};
+
+    if ("theme" in body) {
+      const theme = String(body.theme || "").toLowerCase();
+      if (theme === "light" || theme === "dark") data.theme = theme;
+    }
 
     if ("bio" in body) {
       const bio = body.bio == null ? null : String(body.bio).trim();

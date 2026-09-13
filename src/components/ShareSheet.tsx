@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import {
   Bookmark,
   Copy,
+  Download,
   EyeOff,
   Flag,
   Gauge,
+  Music2,
+  ListPlus,
   X,
 } from "lucide-react";
 import {
@@ -14,39 +17,57 @@ import {
   REPORT_REASONS,
   type PlaybackRate,
 } from "@/lib/limits";
+import { downloadVideo } from "@/lib/download-video";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   caption: string;
+  videoId: string;
   isLoggedIn: boolean;
   bookmarked: boolean;
   playbackRate: PlaybackRate;
+  allowDownload?: boolean;
+  soundUrl?: string | null;
+  soundName?: string | null;
+  soundVolume?: number;
   onCopyLink: () => void;
   onToggleBookmark: () => void;
   onNotInterested: () => void;
   onReport: (reason: string) => Promise<void>;
   onPlaybackRate: (rate: PlaybackRate) => void;
+  onUseSound?: () => void;
+  onAddToPlaylist?: () => void;
 };
 
 export default function ShareSheet({
   open,
   onClose,
   caption,
+  videoId,
   isLoggedIn,
   bookmarked,
   playbackRate,
+  allowDownload = true,
+  soundUrl = null,
   onCopyLink,
   onToggleBookmark,
   onNotInterested,
   onReport,
   onPlaybackRate,
+  onUseSound,
+  onAddToPlaylist,
 }: Props) {
   const [view, setView] = useState<"main" | "speed" | "report">("main");
   const [reporting, setReporting] = useState(false);
+  const [dlMsg, setDlMsg] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    if (!open) setView("main");
+    if (!open) {
+      setView("main");
+      setDlMsg(null);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -71,6 +92,22 @@ export default function ShareSheet({
       onClose();
     } finally {
       setReporting(false);
+    }
+  }
+
+  async function handleDownload() {
+    if (!allowDownload) {
+      setDlMsg("Téléchargement désactivé par l’auteur");
+      return;
+    }
+    setDownloading(true);
+    setDlMsg(null);
+    const r = await downloadVideo(videoId);
+    setDownloading(false);
+    if (!r.ok) setDlMsg(r.error || "Échec");
+    else {
+      setDlMsg("Téléchargement démarré");
+      setTimeout(() => onClose(), 600);
     }
   }
 
@@ -129,6 +166,21 @@ export default function ShareSheet({
                   onClose();
                 }}
               />
+              {allowDownload ? (
+                <SheetAction
+                  icon={<Download size={22} />}
+                  label={downloading ? "…" : "Télécharger"}
+                  onClick={handleDownload}
+                />
+              ) : (
+                <SheetAction
+                  icon={<Download size={22} className="opacity-40" />}
+                  label="Désactivé"
+                  onClick={() =>
+                    setDlMsg("Téléchargement désactivé par l’auteur")
+                  }
+                />
+              )}
               <SheetAction
                 icon={<EyeOff size={22} />}
                 label="Pas intéressé"
@@ -148,7 +200,30 @@ export default function ShareSheet({
                   setView("report");
                 }}
               />
+              {soundUrl && onUseSound && (
+                <SheetAction
+                  icon={<Music2 size={22} className="text-[#25f4ee]" />}
+                  label="Utiliser ce son"
+                  onClick={() => {
+                    onUseSound();
+                    onClose();
+                  }}
+                />
+              )}
+              {isLoggedIn && onAddToPlaylist && (
+                <SheetAction
+                  icon={<ListPlus size={22} />}
+                  label="Playlist"
+                  onClick={() => {
+                    onAddToPlaylist();
+                    onClose();
+                  }}
+                />
+              )}
             </div>
+            {dlMsg && (
+              <p className="px-4 pb-2 text-xs text-amber-200/80">{dlMsg}</p>
+            )}
             <button
               type="button"
               onClick={() => setView("speed")}

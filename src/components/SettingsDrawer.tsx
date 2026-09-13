@@ -4,20 +4,23 @@ import Link from "next/link";
 import { useEffect } from "react";
 import {
   X,
-  Activity,
-  Download,
-  QrCode,
-  Clapperboard,
   Settings,
-  ChevronRight,
-  Database,
-  History,
   Wallet,
-  Rocket,
   Sparkles,
   Info,
   HelpCircle,
   BarChart3,
+  UserX,
+  Flame,
+  FileText,
+  Activity,
+  History,
+  QrCode,
+  Database,
+  Download,
+  Clapperboard,
+  Rocket,
+  ChevronRight,
 } from "lucide-react";
 
 type Props = {
@@ -135,6 +138,10 @@ export default function SettingsDrawer({ open, onClose }: Props) {
           <Section title="AfriVoix">
             <LinkItem href="/a-propos" onClick={onClose} icon={<Info size={20} />} label="À propos" />
             <LinkItem href="/aide" onClick={onClose} icon={<HelpCircle size={20} />} label="Centre d'aide" />
+            <LinkItem href="/parametres/bloques" onClick={onClose} icon={<UserX size={20} />} label="Comptes bloqués" />
+            <LinkItem href="/afripulse" onClick={onClose} icon={<Flame size={20} />} label="AfriPulse" />
+            <LinkItem href="/voix-du-jour" onClick={onClose} icon={<Sparkles size={20} />} label="Voix du jour" />
+            <LinkItem href="/fil" onClick={onClose} icon={<FileText size={20} />} label="Publications" />
             <LinkItem href="/cgu" onClick={onClose} icon={<Info size={20} />} label="CGU" />
           </Section>
 

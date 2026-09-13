@@ -20,15 +20,25 @@ export const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5] as const;
 export type PlaybackRate = (typeof PLAYBACK_RATES)[number];
 
 export const REPORT_REASONS = [
-  { id: "spam", label: "Spam ou publicité" },
-  { id: "hate", label: "Haine ou harcèlement" },
+  { id: "spam", label: "Spam" },
+  { id: "hate", label: "Harcèlement" },
+  { id: "illegal", label: "Contenu illégal" },
   { id: "violence", label: "Violence ou contenus dangereux" },
   { id: "nudity", label: "Nudité ou contenu sexuel" },
   { id: "misinfo", label: "Désinformation" },
   { id: "other", label: "Autre" },
 ] as const;
 
-export const REPORT_TARGET_TYPES = ["video", "user", "comment", "story"] as const;
+export const REPORT_TARGET_TYPES = [
+  "video",
+  "user",
+  "comment",
+  "story",
+  "message",
+  "post",
+  "community",
+  "community_post",
+] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
 export function formatBytesFr(bytes: number): string {

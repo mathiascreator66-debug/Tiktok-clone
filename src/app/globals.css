@@ -2,9 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Default = Clair (blanc) */
 :root {
+  --background: #f5f5f7;
+  --foreground: #0a0a0a;
+  --surface: #ffffff;
+  --surface-2: #efefef;
+  --muted: rgba(0, 0, 0, 0.55);
+  --border: rgba(0, 0, 0, 0.1);
+  --nav: rgba(255, 255, 255, 0.92);
+  --chip: rgba(0, 0, 0, 0.06);
+  --danger: #fe2c55;
+  --accent: #25f4ee;
+}
+
+/* Sombre TikTok-like */
+html.dark {
   --background: #000000;
   --foreground: #ffffff;
+  --surface: #1a1a1a;
+  --surface-2: #111111;
+  --muted: rgba(255, 255, 255, 0.5);
+  --border: rgba(255, 255, 255, 0.12);
+  --nav: rgba(0, 0, 0, 0.92);
+  --chip: rgba(255, 255, 255, 0.1);
+  --danger: #fe2c55;
+  --accent: #25f4ee;
 }
 
 html,
@@ -35,4 +58,74 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/*
+ * Light-mode remaps for the many hardcoded dark TikTok utilities.
+ * Video / Live surfaces opt out with .force-dark
+ */
+html:not(.dark) body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+html:not(.dark) :not(.force-dark):not(.force-dark *) {
+  /* softened — only when not inside force-dark */
+}
+
+/* Remap common dark chrome outside force-dark containers */
+html:not(.dark) main > div.min-h-\[100dvh\],
+html:not(.dark) main > div.min-h-screen {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+html:not(.dark) .bg-black:not(.force-dark):not(.force-dark .bg-black) {
+  background-color: var(--background) !important;
+}
+
+html:not(.dark) .bg-black\/95:not(.force-dark *),
+html:not(.dark) .bg-black\/90:not(.force-dark *),
+html:not(.dark) .bg-black\/80:not(.force-dark *) {
+  background-color: var(--nav) !important;
+  color: var(--foreground) !important;
+}
+
+html:not(.dark) .text-white:not(.force-dark):not(.force-dark *) {
+  color: var(--foreground) !important;
+}
+
+html:not(.dark) .text-white\/70:not(.force-dark *),
+html:not(.dark) .text-white\/60:not(.force-dark *),
+html:not(.dark) .text-white\/50:not(.force-dark *),
+html:not(.dark) .text-white\/45:not(.force-dark *),
+html:not(.dark) .text-white\/40:not(.force-dark *),
+html:not(.dark) .text-white\/35:not(.force-dark *),
+html:not(.dark) .text-white\/30:not(.force-dark *) {
+  color: var(--muted) !important;
+}
+
+html:not(.dark) .bg-white\/5:not(.force-dark *),
+html:not(.dark) .bg-white\/\[0\.05\]:not(.force-dark *),
+html:not(.dark) .bg-white\/\[0\.06\]:not(.force-dark *),
+html:not(.dark) .bg-white\/10:not(.force-dark *),
+html:not(.dark) .bg-white\/15:not(.force-dark *) {
+  background-color: var(--chip) !important;
+}
+
+html:not(.dark) .border-white\/10:not(.force-dark *),
+html:not(.dark) .border-white\/15:not(.force-dark *),
+html:not(.dark) .border-white\/20:not(.force-dark *) {
+  border-color: var(--border) !important;
+}
+
+html:not(.dark) .bg-\[\#1a1a1a\]:not(.force-dark *) {
+  background-color: var(--surface) !important;
+  color: var(--foreground) !important;
+}
+
+/* Keep video feed / live / story viewer dark */
+.force-dark,
+.force-dark * {
+  color-scheme: dark;
 }

@@ -87,6 +87,11 @@ export async function POST(req: NextRequest) {
     const coverFile = form.get("cover") as File | null;
     const textOverlaysRaw = String(form.get("textOverlays") || "").trim();
     const captionsRaw = String(form.get("captions") || "").trim();
+    const allowDownloadRaw = String(form.get("allowDownload") ?? "true").trim().toLowerCase();
+    const allowDownload = !["0", "false", "no", "off"].includes(allowDownloadRaw);
+    // Optional: reuse existing gallery sound by URL (no re-upload)
+    const reuseSoundUrl = String(form.get("reuseSoundUrl") || "").trim();
+    const reuseSoundName = String(form.get("reuseSoundName") || "").trim();
     const textOverlays = textOverlaysRaw
       ? serializeOverlays(parseOverlaysField(textOverlaysRaw))
       : null;
@@ -176,6 +181,12 @@ export async function POST(req: NextRequest) {
         audioFile.name.replace(/\.[^.]+$/, "").trim().slice(0, 60) ||
         "Musique galerie";
       soundName = soundRaw || base;
+    } else if (
+      reuseSoundUrl.startsWith("/uploads/audio/") &&
+      !reuseSoundUrl.includes("..")
+    ) {
+      soundUrl = reuseSoundUrl;
+      soundName = reuseSoundName || soundRaw || "Son réutilisé";
     }
 
     let coverUrl: string | null = null;
@@ -223,6 +234,7 @@ export async function POST(req: NextRequest) {
         videoTrimEndMs,
         textOverlays,
         captions,
+        allowDownload,
         userId: session.id,
         durationSec: durationSec ?? null,
       },
@@ -268,6 +280,7 @@ export async function POST(req: NextRequest) {
         isOwner: true,
         pinned: false,
         boostedUntil: null,
+        allowDownload: video.allowDownload,
         hashtags: tags,
         user: video.user,
         repost: null,

@@ -55,6 +55,7 @@ export default function StudioVideoAnalytics({ videoId }: { videoId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setData(null);
     try {
       const res = await fetch(
         `/api/studio/videos/${videoId}?tab=${tab}&range=${range}`,
@@ -206,13 +207,13 @@ export default function StudioVideoAnalytics({ videoId }: { videoId: string }) {
         <p className="text-center text-[#fe2c55] text-sm py-10 px-4">{error}</p>
       )}
 
-      {!loading && !error && data && tab === "overview" && (
+      {!loading && !error && data && tab === "overview" && (data as OverviewPayload).overview && (
         <OverviewTab data={data as OverviewPayload} />
       )}
-      {!loading && !error && data && tab === "viewers" && (
+      {!loading && !error && data && tab === "viewers" && (data as ViewersPayload).viewers && (
         <ViewersTab data={data as ViewersPayload} />
       )}
-      {!loading && !error && data && tab === "engagement" && (
+      {!loading && !error && data && tab === "engagement" && (data as EngagementPayload).engagement && (
         <EngagementTab data={data as EngagementPayload} />
       )}
     </div>
@@ -329,40 +330,60 @@ type ViewersPayload = {
 
 function ViewersTab({ data }: { data: ViewersPayload }) {
   const v = data.viewers;
-  const typeTotal =
-    v.types.newViewers + v.types.returningViewers || 1;
-  const followTotal =
-    v.types.followerViewers + v.types.nonFollowerViewers || 1;
+  if (!v) {
+    return (
+      <p className="text-center text-white/45 text-sm py-10 px-4">
+        Données limitées
+      </p>
+    );
+  }
+  const types = v.types ?? {
+    newViewers: 0,
+    returningViewers: 0,
+    followerViewers: 0,
+    nonFollowerViewers: 0,
+  };
+  const typeTotal = Math.max(1, (types.newViewers || 0) + (types.returningViewers || 0));
+  const followTotal = Math.max(
+    1,
+    (types.followerViewers || 0) + (types.nonFollowerViewers || 0)
+  );
+  const age = v.age ?? { sampleSize: 0, buckets: [] };
+  const locations = v.locations ?? { sampleSize: 0, countries: [], note: "Données limitées" };
+  const gender = v.gender ?? {
+    available: false,
+    note: "Données limitées — le sexe n’est pas enregistré sur AfriVoix.",
+  };
 
   return (
     <div className="px-3 space-y-4">
       <p className="text-[11px] text-amber-200/70 bg-amber-400/10 border border-amber-400/20 rounded-xl px-3 py-2">
-        {v.limitedNote}
+        {v.limitedNote || "Données limitées"}
       </p>
 
       <section className="rounded-2xl bg-white/[0.06] border border-white/10 p-4">
         <h2 className="text-sm font-semibold mb-3">Types de spectateurs</h2>
         <BarRow
           label="Nouveaux"
-          pct={(v.types.newViewers / typeTotal) * 100}
-          count={v.types.newViewers}
+          pct={(types.newViewers / typeTotal) * 100}
+          count={types.newViewers}
         />
         <BarRow
           label="Récurrents"
-          pct={(v.types.returningViewers / typeTotal) * 100}
-          count={v.types.returningViewers}
+          pct={(types.returningViewers / typeTotal) * 100}
+          count={types.returningViewers}
           color="#fe2c55"
         />
         <div className="mt-3 pt-3 border-t border-white/10">
           <BarRow
             label="Followers"
-            pct={(v.types.followerViewers / followTotal) * 100}
-            count={v.types.followerViewers}
+            pct={(types.followerViewers / followTotal) * 100}
+            count={types.followerViewers}
           />
           <BarRow
             label="Non-followers"
-            pct={(v.types.nonFollowerViewers / followTotal) * 100}
-            count={v.types.nonFollowerViewers}
+            pct={(types.nonFollowerViewers / followTotal) * 100}
+            count={types.nonFollowerViewers}
             color="#a78bfa"
           />
         </div>
@@ -375,22 +396,22 @@ function ViewersTab({ data }: { data: ViewersPayload }) {
 
       <section className="rounded-2xl bg-white/[0.06] border border-white/10 p-4">
         <h2 className="text-sm font-semibold mb-2">Sexe</h2>
-        <p className="text-sm text-white/45">{v.gender.note}</p>
+        <p className="text-sm text-white/45">{gender.note}</p>
       </section>
 
       <section className="rounded-2xl bg-white/[0.06] border border-white/10 p-4">
         <h2 className="text-sm font-semibold mb-3">Âge</h2>
-        {v.age.sampleSize === 0 ? (
+        {age.sampleSize === 0 ? (
           <p className="text-sm text-white/45">Données limitées</p>
         ) : (
-          v.age.buckets
+          (age.buckets || [])
             .filter((b) => b.label !== "inconnu" || b.count > 0)
             .map((b) => (
               <BarRow
                 key={b.label}
                 label={b.label}
-                pct={b.pct}
-                count={b.count}
+                pct={Number.isFinite(b.pct) ? b.pct : 0}
+                count={b.count || 0}
               />
             ))
         )}
@@ -398,18 +419,18 @@ function ViewersTab({ data }: { data: ViewersPayload }) {
 
       <section className="rounded-2xl bg-white/[0.06] border border-white/10 p-4">
         <h2 className="text-sm font-semibold mb-3">Emplacements</h2>
-        {v.locations.note && (
-          <p className="text-[10px] text-white/40 mb-2">{v.locations.note}</p>
+        {locations.note && (
+          <p className="text-[10px] text-white/40 mb-2">{locations.note}</p>
         )}
-        {v.locations.countries.length === 0 ? (
+        {(locations.countries || []).length === 0 ? (
           <p className="text-sm text-white/45">Données limitées</p>
         ) : (
-          v.locations.countries.map((c) => (
+          locations.countries.map((c) => (
             <BarRow
               key={c.code}
               label={c.code}
-              pct={c.pct}
-              count={c.count}
+              pct={Number.isFinite(c.pct) ? c.pct : 0}
+              count={c.count || 0}
               color="#fbbf24"
             />
           ))

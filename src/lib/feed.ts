@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import type { SessionUser } from "./auth";
 import type { FeedVideo } from "./types";
 import { parseOverlaysField, parseCaptionsField, normalizeStoredGain } from "./media-edit";
+import { excludedUserIds } from "./blocks";
 
 type VideoWithRelations = {
   id: string;
@@ -20,6 +21,7 @@ type VideoWithRelations = {
   captions?: string | null;
   pinnedAt: Date | null;
   boostedUntil: Date | null;
+  allowDownload?: boolean;
   createdAt: Date;
   userId: string;
   user: {
@@ -69,6 +71,7 @@ function mapVideo(
     isOwner: session?.id === v.userId,
     pinned: Boolean(v.pinnedAt),
     boostedUntil: v.boostedUntil ? v.boostedUntil.toISOString() : null,
+    allowDownload: v.allowDownload !== false,
     hashtags: v.hashtags?.map((h) => h.hashtag.name) ?? [],
     user: {
       id: v.user.id,
@@ -170,12 +173,18 @@ async function buildMixedFeed(
   rankByEngagement = false
 ): Promise<FeedVideo[]> {
   const hidden = await hiddenVideoIds(session);
+  const excluded = await excludedUserIds(session?.id);
+  let scopedUserIds = userIds;
+  if (excluded.length && userIds) {
+    const ex = new Set(excluded);
+    scopedUserIds = userIds.filter((id) => !ex.has(id));
+  }
   const videoWhere = {
-    ...(userIds ? { userId: { in: userIds } } : {}),
+    ...(scopedUserIds ? { userId: { in: scopedUserIds } } : excluded.length ? { userId: { notIn: excluded } } : {}),
     ...(hidden.length ? { id: { notIn: hidden } } : {}),
   };
   const repostWhere = {
-    ...(userIds ? { userId: { in: userIds } } : {}),
+    ...(scopedUserIds ? { userId: { in: scopedUserIds } } : excluded.length ? { userId: { notIn: excluded } } : {}),
     ...(hidden.length ? { videoId: { notIn: hidden } } : {}),
   };
 

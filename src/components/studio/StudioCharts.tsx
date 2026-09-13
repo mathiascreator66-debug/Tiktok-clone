@@ -103,7 +103,10 @@ export function BarRow({
       <div className="flex justify-between text-xs mb-1">
         <span className="text-white/70">{label}</span>
         <span className="text-white/45">
-          {pct.toFixed(pct % 1 ? 1 : 0).replace(".", ",")} %
+          {(Number.isFinite(pct) ? pct : 0)
+            .toFixed((Number.isFinite(pct) ? pct : 0) % 1 ? 1 : 0)
+            .replace(".", ",")}{" "}
+          %
           {count != null ? ` · ${count}` : ""}
         </span>
       </div>

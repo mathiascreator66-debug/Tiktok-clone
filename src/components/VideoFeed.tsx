@@ -149,7 +149,7 @@ export default function VideoFeed({
   function renderFollowingEmpty() {
     if (!isLoggedIn || followingError === "login") {
       return (
-        <div className="h-[100dvh] flex flex-col items-center justify-center text-center px-6">
+        <div className="force-dark h-[100dvh] flex flex-col items-center justify-center text-center px-6">
           <p className="text-xl font-bold mb-2">Abonnements</p>
           <p className="text-white/50 text-sm mb-5 max-w-xs">
             Connectez-vous pour voir les vidéos des comptes que vous suivez.

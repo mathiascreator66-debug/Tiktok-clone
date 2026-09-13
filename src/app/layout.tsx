@@ -4,6 +4,10 @@ import Navbar from "@/components/Navbar";
 import { getSession } from "@/lib/auth";
 import { unreadMessageCount } from "@/lib/messages";
 import { I18nProvider } from "@/lib/i18n";
+import ThemeProvider from "@/components/ThemeProvider";
+import ThemeScript from "@/components/ThemeScript";
+import { cookies } from "next/headers";
+import type { ThemeMode } from "@/lib/theme";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
@@ -36,6 +40,12 @@ export default async function RootLayout({
   const session = await getSession();
   let unread = 0;
   let isStaff = false;
+  let initialTheme: ThemeMode = "light";
+  const cookieTheme = cookies().get("afrivoix_theme")?.value;
+  if (cookieTheme === "dark" || cookieTheme === "light") {
+    initialTheme = cookieTheme;
+  }
+
   if (session) {
     try {
       unread = await unreadMessageCount(session.id);
@@ -46,25 +56,33 @@ export default async function RootLayout({
       const { prisma } = await import("@/lib/prisma");
       const u = await prisma.user.findUnique({
         where: { id: session.id },
-        select: { isAdmin: true, isModerator: true },
+        select: { isAdmin: true, isModerator: true, theme: true },
       });
       isStaff = Boolean(u?.isAdmin || u?.isModerator);
+      if (u?.theme === "dark" || u?.theme === "light") {
+        initialTheme = u.theme;
+      }
     } catch {
       isStaff = false;
     }
   }
 
   return (
-    <html lang="fr">
-      <body className="bg-black text-white antialiased">
-        <I18nProvider initialLang="fr">
-          <Navbar
-            user={session ? { username: session.username } : null}
-            initialUnread={unread}
-            isStaff={isStaff}
-          />
-          <main>{children}</main>
-        </I18nProvider>
+    <html lang="fr" data-theme={initialTheme} className={initialTheme === "dark" ? "dark" : undefined} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
+      <body className="bg-background text-foreground antialiased">
+        <ThemeProvider initialTheme={initialTheme}>
+          <I18nProvider initialLang="fr">
+            <Navbar
+              user={session ? { username: session.username } : null}
+              initialUnread={unread}
+              isStaff={isStaff}
+            />
+            <main>{children}</main>
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

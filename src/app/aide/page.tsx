@@ -16,7 +16,11 @@ const FAQ = [
   },
   {
     q: "Comment signaler un contenu ?",
-    a: "Sur une vidéo : menu Partager → Signaler. Vous pouvez aussi signaler un utilisateur depuis son profil. Les signalements rejoignent la file de modération.",
+    a: "Sur une vidéo : menu Partager → Signaler → choisissez Spam, Harcèlement, Contenu illégal ou Autre. Même principe sur profils, commentaires, messages, publications et panneaux. Les signalements rejoignent la file admin.",
+  },
+  {
+    q: "Comment contacter le support client ?",
+    a: "Utilisez le formulaire ci-dessous (sujet + message). Connecté ou non : indiquez un email de réponse. Les tickets apparaissent dans l’espace admin.",
   },
   {
     q: "Mes messages sont-ils privés ?",

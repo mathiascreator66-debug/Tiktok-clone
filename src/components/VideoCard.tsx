@@ -27,6 +27,9 @@ import type { PlaybackRate } from "@/lib/limits";
 import { LinkifiedText } from "@/lib/linkify";
 import { applyMediaGain } from "@/lib/media-edit";
 import VideoMediaOverlays from "./VideoMediaOverlays";
+import PlaylistPicker from "./PlaylistPicker";
+import { reuseSoundNavigate } from "@/lib/download-video";
+import { getDataSaver, translateBestEffort } from "@/lib/preferences";
 
 type WatchSource = "pour_toi" | "profil" | "recherche" | "abonnements" | "autre";
 
@@ -63,6 +66,7 @@ export default function VideoCard({
   const [caption, setCaption] = useState(video.caption);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
   const [boostedUntil, setBoostedUntil] = useState(video.boostedUntil);
   const [muted, setMuted] = useState(false);
@@ -78,6 +82,7 @@ export default function VideoCard({
   const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
   const [currentMs, setCurrentMs] = useState(0);
   const [showCaptions, setShowCaptions] = useState(true);
+  const [translated, setTranslated] = useState(false);
   const lastTapRef = useRef(0);
   const muteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const likingRef = useRef(false);
@@ -585,7 +590,7 @@ export default function VideoCard({
         }}
       />
       {video.soundUrl ? (
-        <audio ref={audioRef} src={video.soundUrl} preload="auto" />
+        <audio ref={audioRef} src={video.soundUrl} preload={typeof window !== "undefined" && getDataSaver() ? "metadata" : "auto"} />
       ) : null}
 
       <VideoMediaOverlays
@@ -781,13 +786,43 @@ export default function VideoCard({
             Boosté
           </span>
         )}
-        <p className="text-sm mt-1 text-white/90 line-clamp-3 pointer-events-auto"><LinkifiedText text={caption} /></p>
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-white/70 truncate">
+        <p className="text-sm mt-1 text-white/90 line-clamp-3 pointer-events-auto">
+          <LinkifiedText
+            text={translated ? translateBestEffort(caption, "en") : caption}
+          />
+        </p>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setTranslated((v) => !v);
+          }}
+          className="mt-1 text-[10px] text-[#25f4ee]/80 pointer-events-auto"
+        >
+          {translated ? "Voir l’original" : "Traduire"}
+        </button>
+        <div className="mt-2 flex items-center gap-2 text-xs text-white/70 min-w-0">
           <Music2 size={12} className="shrink-0 opacity-80" />
           <span className="truncate">
             {soundLabel(video.soundName, video.user.username)}
           </span>
-        </p>
+          {video.soundUrl && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                reuseSoundNavigate({
+                  soundUrl: video.soundUrl!,
+                  soundName: video.soundName,
+                  soundVolume: video.soundVolume,
+                });
+              }}
+              className="shrink-0 pointer-events-auto px-2 py-0.5 rounded-full bg-white/15 hover:bg-white/25 text-[10px] font-semibold whitespace-nowrap"
+            >
+              Utiliser ce son
+            </button>
+          )}
+        </div>
         {playbackRate !== 1 && (
           <p className="mt-1 text-[11px] text-white/50">{playbackRate}×</p>
         )}
@@ -849,14 +884,39 @@ export default function VideoCard({
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         caption={caption}
+        videoId={video.id}
         isLoggedIn={isLoggedIn}
         bookmarked={bookmarked}
         playbackRate={playbackRate}
+        allowDownload={video.allowDownload !== false}
+        soundUrl={video.soundUrl}
+        soundName={video.soundName}
+        soundVolume={video.soundVolume}
         onCopyLink={copyLink}
         onToggleBookmark={toggleBookmark}
         onNotInterested={hideVideo}
         onReport={reportVideo}
         onPlaybackRate={setPlaybackRate}
+        onUseSound={
+          video.soundUrl
+            ? () =>
+                reuseSoundNavigate({
+                  soundUrl: video.soundUrl!,
+                  soundName: video.soundName,
+                  soundVolume: video.soundVolume,
+                })
+            : undefined
+        }
+        onAddToPlaylist={
+          isLoggedIn ? () => setPlaylistOpen(true) : undefined
+        }
+      />
+
+      <PlaylistPicker
+        open={playlistOpen}
+        onClose={() => setPlaylistOpen(false)}
+        videoId={video.id}
+        onDone={(msg) => setToast(msg)}
       />
 
       <TipSheet

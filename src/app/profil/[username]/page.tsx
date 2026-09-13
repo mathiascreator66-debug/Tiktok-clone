@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import ProfileHeader from "@/components/ProfileHeader";
 import ProfileTabs from "@/components/ProfileTabs";
 import { isProActive } from "@/lib/wallet-shared";
+import { isBlockedEither } from "@/lib/blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,23 @@ export default async function ProfilPage({
   });
 
   if (!user) notFound();
+
+  if (session && session.id !== user.id) {
+    const blocked = await isBlockedEither(session.id, user.id);
+    if (blocked) {
+      return (
+        <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 text-center">
+          <p className="text-lg font-semibold mb-2">Utilisateur indisponible</p>
+          <p className="text-sm text-white/50 mb-6">
+            Ce profil n’est pas accessible.
+          </p>
+          <a href="/" className="text-sm font-semibold text-[#25f4ee]">
+            Retour au fil
+          </a>
+        </div>
+      );
+    }
+  }
 
   const isMe = session?.id === user.id;
   const displayName = user.displayName || user.username;
@@ -94,6 +112,27 @@ export default async function ProfilPage({
     }));
   }
 
+  const [playlists, ownedCommunity] = await Promise.all([
+    prisma.playlist.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+      include: {
+        _count: { select: { items: true } },
+        items: {
+          orderBy: { sortOrder: "asc" },
+          take: 1,
+          include: { video: { select: { coverUrl: true, videoUrl: true } } },
+        },
+      },
+    }),
+    prisma.community.findFirst({
+      where: { ownerId: user.id },
+      select: { slug: true },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+
   return (
     <div className="min-h-[100dvh] pt-4 md:pt-20 pb-20 px-4 max-w-2xl mx-auto">
       <ProfileHeader
@@ -111,6 +150,17 @@ export default async function ProfilPage({
         isVerified={user.isVerified}
         hasActiveStories={activeStoryCount > 0}
         links={user.profileLinks}
+        panneauSlug={ownedCommunity?.slug ?? null}
+        playlists={playlists.map((pl) => ({
+          id: pl.id,
+          title: pl.title,
+          coverUrl:
+            pl.coverUrl ||
+            pl.items[0]?.video.coverUrl ||
+            pl.items[0]?.video.videoUrl ||
+            null,
+          itemCount: pl._count.items,
+        }))}
       />
 
       <ProfileTabs

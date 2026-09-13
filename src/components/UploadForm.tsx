@@ -59,6 +59,8 @@ export default function UploadForm({ username }: { username: string }) {
   const [source, setSource] = useState<"gallery" | "camera">("gallery");
   const [showCamera, setShowCamera] = useState(false);
   const [previewUnlocked, setPreviewUnlocked] = useState(false);
+  const [allowDownload, setAllowDownload] = useState(true);
+  const [reuseSoundUrl, setReuseSoundUrl] = useState<string | null>(null);
 
   // Live preview: apply « Son original » to the preview video immediately
   useEffect(() => {
@@ -86,6 +88,39 @@ export default function UploadForm({ username }: { username: string }) {
   useEffect(() => {
     applyMediaGain(galleryAudioRef.current, soundVolume);
   }, [soundVolume]);
+
+  // Preselect sound from « Utiliser ce son » (query params or sessionStorage)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      let url = params.get("soundUrl");
+      let name = params.get("soundName");
+      let vol = params.get("soundVolume");
+      if (!url) {
+        const raw = sessionStorage.getItem("afrivoix_reuse_sound");
+        if (raw) {
+          const parsed = JSON.parse(raw) as {
+            soundUrl?: string;
+            soundName?: string;
+            soundVolume?: number;
+          };
+          url = parsed.soundUrl || null;
+          name = parsed.soundName || name;
+          if (parsed.soundVolume != null) vol = String(parsed.soundVolume);
+          sessionStorage.removeItem("afrivoix_reuse_sound");
+        }
+      }
+      if (url && url.startsWith("/uploads/")) {
+        setReuseSoundUrl(url);
+        if (name) setSoundName(name);
+        if (vol != null && Number.isFinite(Number(vol))) {
+          setSoundVolume(Math.min(2, Math.max(0, Number(vol))));
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
 
   function applyMediaFile(f: File, url: string) {
@@ -171,6 +206,7 @@ export default function UploadForm({ username }: { username: string }) {
 
   function clearAudio() {
     setAudioFile(null);
+    setReuseSoundUrl(null);
     if (audioRef.current) audioRef.current.value = "";
     setSoundName(originalSoundName(username));
     setSoundVolume(1);
@@ -206,6 +242,7 @@ export default function UploadForm({ username }: { username: string }) {
       form.append("caption", caption);
       form.append("video", file);
       form.append("soundName", soundName);
+      form.append("allowDownload", allowDownload ? "true" : "false");
       if (durationSec != null) form.append("durationSec", String(durationSec));
       form.append("originalVolume", String(originalVolume));
       form.append(
@@ -231,6 +268,10 @@ export default function UploadForm({ username }: { username: string }) {
             String(Math.round(trimEndSec * 1000))
           );
         }
+      } else if (reuseSoundUrl) {
+        form.append("reuseSoundUrl", reuseSoundUrl);
+        form.append("reuseSoundName", soundName);
+        form.append("soundVolume", String(soundVolume));
       }
       if (coverBlob) {
         form.append(
@@ -526,7 +567,7 @@ export default function UploadForm({ username }: { username: string }) {
           />
         )}
 
-        {!audioFile && (
+        {!audioFile && !reuseSoundUrl && (
           <SoundPicker
             value={soundName}
             username={username}
@@ -568,6 +609,33 @@ export default function UploadForm({ username }: { username: string }) {
           videoUrl={preview}
         />
       </section>
+
+      {reuseSoundUrl && !audioFile && (
+        <div className="rounded-xl bg-[#25f4ee]/10 border border-[#25f4ee]/30 px-3 py-2 text-sm flex items-start gap-2">
+          <Music2 size={16} className="shrink-0 mt-0.5 text-[#25f4ee]" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-[#25f4ee]">Son préselectionné</p>
+            <p className="text-white/70 truncate text-xs">{soundName}</p>
+            <button
+              type="button"
+              onClick={clearAudio}
+              className="text-xs text-white/50 underline mt-1"
+            >
+              Retirer
+            </button>
+          </div>
+        </div>
+      )}
+
+      <label className="flex items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3 cursor-pointer">
+        <span className="text-sm font-medium">Autoriser le téléchargement</span>
+        <input
+          type="checkbox"
+          checked={allowDownload}
+          onChange={(e) => setAllowDownload(e.target.checked)}
+          className="w-5 h-5 accent-[#fe2c55]"
+        />
+      </label>
 
       {error && <p className="text-[#fe2c55] text-sm">{error}</p>}
 

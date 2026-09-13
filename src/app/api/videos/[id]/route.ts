@@ -50,7 +50,12 @@ export async function PATCH(
       soundTrimEndMs?: number | null;
       textOverlays?: string | null;
       captions?: string | null;
+      allowDownload?: boolean;
     } = { caption };
+
+    if (typeof body.allowDownload === "boolean") {
+      data.allowDownload = body.allowDownload;
+    }
 
     if (body.soundVolume != null) {
       data.soundVolume = parseGain(body.soundVolume, 1);

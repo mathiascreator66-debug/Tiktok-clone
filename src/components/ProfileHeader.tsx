@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Gift, Flag, Link as LinkIcon, Menu, Pencil, UserPlus, BarChart3 } from "lucide-react";
+import { Gift, Flag, Link as LinkIcon, Menu, Pencil, UserPlus, BarChart3, Share2, Radio, ListMusic } from "lucide-react";
 import type { ProfileLinkItem } from "@/lib/types";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
@@ -12,6 +12,8 @@ import TipSheet from "./TipSheet";
 import StoryViewer from "./StoryViewer";
 import { formatCount } from "@/lib/format";
 import type { StoryGroup } from "@/lib/types";
+import ProfileShareSheet from "./ProfileShareSheet";
+import AvatarLightbox from "./AvatarLightbox";
 
 type Props = {
   username: string;
@@ -29,6 +31,8 @@ type Props = {
   /** Server hint — client also refetches for freshness */
   hasActiveStories?: boolean;
   links?: ProfileLinkItem[];
+  panneauSlug?: string | null;
+  playlists?: { id: string; title: string; coverUrl?: string | null; itemCount: number }[];
 };
 
 export default function ProfileHeader({
@@ -46,6 +50,8 @@ export default function ProfileHeader({
   isVerified = false,
   hasActiveStories = false,
   links = [],
+  panneauSlug = null,
+  playlists = [],
 }: Props) {
   const [drawer, setDrawer] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -56,6 +62,10 @@ export default function ProfileHeader({
   const [following, setFollowing] = useState(initialFollowing);
   const [storyGroup, setStoryGroup] = useState<StoryGroup | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
 
   const loadStories = useCallback(async () => {
     try {
@@ -83,13 +93,45 @@ export default function ProfileHeader({
     loadStories();
   }, [loadStories]);
 
+  useEffect(() => {
+    if (isMe || !isLoggedIn) return;
+    fetch(`/api/blocks/${encodeURIComponent(username)}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setBlocked(!!d.blocked))
+      .catch(() => {});
+  }, [username, isMe, isLoggedIn]);
+
+  async function toggleBlock() {
+    if (!isLoggedIn) {
+      window.location.href = "/connexion";
+      return;
+    }
+    if (!blocked && !confirm(`Bloquer @${username} ?`)) return;
+    setBlockBusy(true);
+    try {
+      const res = await fetch(`/api/blocks/${encodeURIComponent(username)}`, {
+        method: blocked ? "DELETE" : "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setBlocked(!blocked);
+        if (!blocked) window.location.href = "/";
+      }
+    } finally {
+      setBlockBusy(false);
+    }
+  }
+
   const hasStories = Boolean(storyGroup?.stories.length) || hasActiveStories;
   const ringUnviewed = storyGroup?.hasUnviewed ?? hasActiveStories;
 
   function onAvatarActivate() {
+    // TikTok-like: story ring → stories; otherwise → full photo
     if (storyGroup && storyGroup.stories.length > 0) {
       setViewerOpen(true);
+      return;
     }
+    setPhotoOpen(true);
   }
 
 
@@ -136,14 +178,23 @@ export default function ProfileHeader({
           )}
         </div>
 
-        {hasStories ? (
-          <button
-            type="button"
-            onClick={onAvatarActivate}
-            disabled={!storyGroup}
-            className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25f4ee] disabled:opacity-90"
-            aria-label={`Voir les stories de @${username}`}
-          >
+        <button
+          type="button"
+          onClick={onAvatarActivate}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setPhotoOpen(true);
+          }}
+          disabled={hasStories && !storyGroup}
+          className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25f4ee] disabled:opacity-90"
+          aria-label={
+            hasStories
+              ? `Voir les stories de @${username}`
+              : `Voir la photo de profil de @${username}`
+          }
+          title={hasStories ? "Appui long / clic droit : voir la photo" : undefined}
+        >
+          {hasStories ? (
             <div
               className={`p-[3px] rounded-full ${
                 ringUnviewed
@@ -155,10 +206,10 @@ export default function ProfileHeader({
                 <Avatar username={username} avatarUrl={avatarUrl} size={88} isPro={isPro} />
               </div>
             </div>
-          </button>
-        ) : (
-          <Avatar username={username} avatarUrl={avatarUrl} size={88} isPro={isPro} />
-        )}
+          ) : (
+            <Avatar username={username} avatarUrl={avatarUrl} size={88} isPro={isPro} />
+          )}
+        </button>
 
         <div className="flex items-center gap-2 mt-3">
           <h1 className="text-xl font-bold">{displayName}</h1>
@@ -316,9 +367,81 @@ export default function ProfileHeader({
                   <Flag size={14} />
                 </button>
               )}
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  disabled={blockBusy}
+                  onClick={toggleBlock}
+                  className="inline-flex items-center gap-1 bg-white/10 border border-white/15 px-3 py-2 rounded-md text-sm text-[#fe2c55]"
+                >
+                  {blocked ? "Débloquer" : "Bloquer"}
+                </button>
+              )}
             </>
           )}
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+          >
+            <Share2 size={14} /> Partager
+          </button>
+          {panneauSlug && (
+            <Link
+              href={`/communaute/${panneauSlug}`}
+              className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+            >
+              <Radio size={14} className="text-[#25f4ee]" /> Panneau
+            </Link>
+          )}
+          {isMe && !panneauSlug && (
+            <Link
+              href="/communautes?creer=1"
+              className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+            >
+              <Radio size={14} /> Créer un panneau
+            </Link>
+          )}
         </div>
+
+        {playlists.length > 0 && (
+          <div className="mt-4 w-full max-w-md text-left">
+            <p className="text-xs text-white/45 font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <ListMusic size={12} /> Playlist
+            </p>
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+              {playlists.map((pl) => (
+                <Link
+                  key={pl.id}
+                  href={`/playlists/${pl.id}`}
+                  className="shrink-0 w-28 rounded-xl overflow-hidden bg-white/5 border border-white/10"
+                >
+                  <div className="aspect-square bg-white/10 relative">
+                    {pl.coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={pl.coverUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white/30">
+                        <ListMusic size={22} />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[11px] font-semibold px-2 py-1.5 truncate">
+                    {pl.title}
+                  </p>
+                  <p className="text-[10px] text-white/40 px-2 pb-1.5">
+                    {pl.itemCount} vidéo{pl.itemCount === 1 ? "" : "s"}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {reportMsg && <p className="text-xs text-[#d4af37] mt-2">{reportMsg}</p>}
         {reportOpen && (
           <div className="mt-2 rounded-xl border border-white/10 bg-black/80 p-3 space-y-1.5">
@@ -341,6 +464,21 @@ export default function ProfileHeader({
           </div>
         )}
       </div>
+
+      <AvatarLightbox
+        open={photoOpen}
+        onClose={() => setPhotoOpen(false)}
+        avatarUrl={avatarUrl}
+        username={username}
+        displayName={displayName}
+      />
+
+      <ProfileShareSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        username={username}
+        displayName={displayName}
+      />
 
       {isMe && (
         <SettingsDrawer open={drawer} onClose={() => setDrawer(false)} />

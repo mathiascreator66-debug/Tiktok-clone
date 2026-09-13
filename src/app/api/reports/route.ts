@@ -50,6 +50,22 @@ export async function POST(req: NextRequest) {
     } else if (targetType === "story") {
       const s = await prisma.story.findUnique({ where: { id: targetId } });
       if (!s) return NextResponse.json({ error: "Story introuvable." }, { status: 404 });
+    } else if (targetType === "post") {
+      const post = await prisma.post.findUnique({ where: { id: targetId } });
+      if (!post) return NextResponse.json({ error: "Publication introuvable." }, { status: 404 });
+    } else if (targetType === "community" || targetType === "community_post") {
+      // accept id/slug — best-effort existence
+      const found =
+        (await prisma.community.findFirst({
+          where: { OR: [{ id: targetId }, { slug: targetId }] },
+        })) ||
+        (await prisma.communityPost.findUnique({ where: { id: targetId } }));
+      if (!found && targetType === "community") {
+        return NextResponse.json({ error: "Panneau introuvable." }, { status: 404 });
+      }
+    } else if (targetType === "message") {
+      const m = await prisma.message.findUnique({ where: { id: targetId } });
+      if (!m) return NextResponse.json({ error: "Message introuvable." }, { status: 404 });
     }
 
     const resolvedId =

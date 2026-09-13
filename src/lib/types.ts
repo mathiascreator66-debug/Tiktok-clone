@@ -25,6 +25,7 @@ export type FeedVideo = {
   isOwner: boolean;
   pinned: boolean;
   boostedUntil: string | null;
+  allowDownload: boolean;
   hashtags?: string[];
   user: {
     id: string;
