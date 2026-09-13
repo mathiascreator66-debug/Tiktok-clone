@@ -17,6 +17,7 @@ type UserHit = {
   followerCount: number;
   videoCount: number;
   isVerified?: boolean;
+  isPro?: boolean;
 };
 
 type VideoHit = {
