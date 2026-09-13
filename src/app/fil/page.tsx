@@ -11,6 +11,7 @@ import {
   ImagePlus,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import PostCommentsSheet from "@/components/PostCommentsSheet";
 import { formatRelativeFr } from "@/lib/time";
 import { formatCount } from "@/lib/format";
 
@@ -39,6 +40,7 @@ export default function FilPage() {
   const [previews, setPreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [commentPost, setCommentPost] = useState<Post | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -141,7 +143,8 @@ export default function FilPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] pt-2 md:pt-16 pb-28 max-w-lg mx-auto px-3">
+    <>
+      <div className="min-h-[100dvh] pt-2 md:pt-16 pb-28 max-w-lg mx-auto px-3">
       <header className="flex items-center gap-2 h-12 mb-4">
         <Link href="/" className="p-2 -ml-1 rounded-full hover:bg-white/10" aria-label="Retour">
           <ArrowLeft size={22} />
@@ -278,12 +281,15 @@ export default function FilPage() {
                 J’aime
                 {p.likeCount > 0 ? ` · ${formatCount(p.likeCount)}` : ""}
               </button>
-              <Link
-                href={`/fil#${p.id}`}
+              <button
+                type="button"
+                onClick={() => setCommentPost(p)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 hover:bg-white/5"
+                aria-label={`Commenter la publication de @${p.author.username}`}
               >
                 <MessageCircle size={16} /> Commenter
-              </Link>
+                {p.commentCount > 0 ? ` · ${formatCount(p.commentCount)}` : ""}
+              </button>
               <button
                 type="button"
                 onClick={() => share(p)}
@@ -300,6 +306,25 @@ export default function FilPage() {
           </p>
         )}
       </ul>
-    </div>
+      </div>
+      <PostCommentsSheet
+        post={commentPost}
+        onClose={() => setCommentPost(null)}
+        onCommentAdded={(postId) => {
+          setPosts((current) =>
+            current.map((post) =>
+              post.id === postId
+                ? { ...post, commentCount: post.commentCount + 1 }
+                : post
+            )
+          );
+          setCommentPost((current) =>
+            current && current.id === postId
+              ? { ...current, commentCount: current.commentCount + 1 }
+              : current
+          );
+        }}
+      />
+    </>
   );
 }

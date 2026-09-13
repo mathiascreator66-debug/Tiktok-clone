@@ -28,13 +28,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         },
       },
     });
-    const canPost =
-      community.ownerId === session.id ||
-      member?.role === "OWNER" ||
-      member?.role === "ADMIN";
+    const canPost = community.ownerId === session.id || Boolean(member);
     if (!canPost) {
       return NextResponse.json(
-        { error: "Seuls le propriétaire / admins peuvent publier." },
+        { error: "Rejoignez le panneau pour publier." },
         { status: 403 }
       );
     }

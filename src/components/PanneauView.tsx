@@ -7,11 +7,11 @@ import {
   BarChart3,
   Heart,
   ImagePlus,
-  Plus,
   Send,
   Calendar,
   FolderOpen,
   Vote,
+  Video,
 } from "lucide-react";
 import Avatar from "./Avatar";
 import { formatCount } from "@/lib/format";
@@ -194,12 +194,12 @@ export default function PanneauView({ slug }: { slug: string }) {
     );
   }
 
-  const canPost = c.isOwner || c.myRole === "ADMIN" || c.myRole === "OWNER";
+  const canPost = c.isOwner || c.isMember;
   const ownerLabel = c.owner.displayName || c.owner.username;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-[#0b0b0b] md:pt-14">
-      <header className="flex items-center gap-2 px-3 h-14 border-b border-white/10 shrink-0 bg-black/95">
+    <div className="fixed inset-x-0 top-0 bottom-14 z-40 flex flex-col bg-background md:inset-0 md:pt-14">
+      <header className="flex items-center gap-2 px-3 h-14 border-b border-white/10 shrink-0 bg-[var(--nav)] backdrop-blur">
         <Link
           href={`/profil/${c.owner.username}`}
           className="p-2 -ml-1 rounded-full hover:bg-white/10"
@@ -250,15 +250,19 @@ export default function PanneauView({ slug }: { slug: string }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 py-4 pb-6 space-y-4">
         {c.posts.length === 0 && (
           <p className="text-center text-white/35 text-sm py-16">
             Aucune publication pour l’instant.
           </p>
         )}
         {[...c.posts].reverse().map((p) => (
-          <article key={p.id} className="flex justify-end">
-            <div className="max-w-[88%] rounded-2xl rounded-br-md bg-[#1f3d2b] overflow-hidden shadow-lg">
+          <article key={p.id} className="flex gap-2 items-end">
+            <Avatar username={p.author.username} avatarUrl={p.author.avatarUrl} size={28} />
+            <div className="max-w-[88%] rounded-2xl rounded-bl-md bg-[#183b2a] text-white dark:bg-[#1f3d2b] overflow-hidden shadow-lg">
+              <p className="px-3 pt-2 text-[11px] font-semibold text-[#25f4ee]">
+                {p.author.displayName || p.author.username}
+              </p>
               {p.videoUrl && (
                 <video
                   src={p.videoUrl}
@@ -305,7 +309,7 @@ export default function PanneauView({ slug }: { slug: string }) {
         <div ref={bottomRef} />
       </div>
 
-      <div className="shrink-0 border-t border-white/10 bg-black/95">
+      <div className="shrink-0 border-t border-white/10 bg-[var(--nav)] backdrop-blur">
         <div className="flex gap-2 px-3 pt-2 overflow-x-auto scrollbar-hide">
           {(
             [
@@ -336,21 +340,23 @@ export default function PanneauView({ slug }: { slug: string }) {
           </p>
         )}
 
+        {error && <p className="px-3 pt-2 text-xs text-[#fe2c55]">{error}</p>}
         {canPost ? (
           <form
             onSubmit={(e) => {
               e.preventDefault();
               publish();
             }}
-            className="flex items-end gap-2 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            className="flex min-w-0 items-end gap-2 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="p-2.5 rounded-full bg-white/10"
-              aria-label="Image"
+              className="shrink-0 p-2.5 rounded-full bg-white/10 hover:bg-white/15"
+              aria-label="Joindre une image"
+              title="Joindre une image"
             >
-              <Plus size={18} />
+              <ImagePlus size={18} />
             </button>
             <input
               ref={fileRef}
@@ -364,15 +370,16 @@ export default function PanneauView({ slug }: { slug: string }) {
               onChange={(e) => setText(e.target.value)}
               placeholder="Écrire une actu…"
               maxLength={2000}
-              className="flex-1 bg-white/10 rounded-full px-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#25f4ee]/40"
+              className="min-w-0 flex-1 bg-white/10 rounded-full px-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#25f4ee]/40"
             />
             <button
               type="button"
               onClick={() => videoRef.current?.click()}
-              className="p-2.5 rounded-full bg-white/10"
-              aria-label="Vidéo"
+              className="shrink-0 p-2.5 rounded-full bg-white/10 hover:bg-white/15"
+              aria-label="Joindre une vidéo"
+              title="Joindre une vidéo"
             >
-              <ImagePlus size={18} />
+              <Video size={18} />
             </button>
             <input
               ref={videoRef}
@@ -384,7 +391,7 @@ export default function PanneauView({ slug }: { slug: string }) {
             <button
               type="submit"
               disabled={sending || !text.trim()}
-              className="p-2.5 rounded-full bg-[#25f4ee] text-black disabled:opacity-40"
+              className="shrink-0 p-2.5 rounded-full bg-[#25f4ee] text-black disabled:opacity-40"
               aria-label="Publier"
             >
               <Send size={18} />

@@ -2,7 +2,23 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Gift, Flag, Link as LinkIcon, Menu, Pencil, UserPlus, BarChart3, Share2, Radio, ListMusic } from "lucide-react";
+import {
+  BadgeCheck,
+  BarChart3,
+  CreditCard,
+  Crown,
+  Flag,
+  Gift,
+  History,
+  LayoutGrid,
+  Link as LinkIcon,
+  ListMusic,
+  Menu,
+  Radio,
+  Share2,
+  UserPlus,
+  WalletCards,
+} from "lucide-react";
 import type { ProfileLinkItem } from "@/lib/types";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
@@ -65,6 +81,7 @@ export default function ProfileHeader({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [premiumOpen, setPremiumOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
 
@@ -215,15 +232,6 @@ export default function ProfileHeader({
         <div className="flex items-center gap-2 mt-3">
           <h1 className="text-xl font-bold">{displayName}</h1>
           {(isVerified || isPro) && <VerifiedBadge size={18} />}
-          {isMe && (
-            <Link
-              href={`/profil/${username}/modifier`}
-              className="p-1.5 rounded-md bg-white/10 border border-white/15 hover:bg-white/15"
-              aria-label="Modifier le profil"
-            >
-              <Pencil size={14} />
-            </Link>
-          )}
         </div>
         <p className="text-white/50 text-sm">@{username}</p>
 
@@ -272,41 +280,22 @@ export default function ProfileHeader({
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-2 justify-center">
+        <div className={`mt-4 flex w-full max-w-md gap-2 justify-center px-1 ${isMe ? "" : "flex-wrap"}`}>
           {isMe ? (
             <>
               <Link
                 href={`/profil/${username}/modifier`}
-                className="inline-block bg-white/10 hover:bg-white/15 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+                className="flex-1 bg-white/10 hover:bg-white/15 border border-white/15 px-4 py-2.5 rounded-md text-sm font-semibold"
               >
-                Modifier
+                Modifier le profil
               </Link>
-              <Link
-                href="/telecharger"
-                className="inline-block bg-[#fe2c55] px-5 py-2 rounded-md text-sm font-semibold"
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 border border-white/15 px-4 py-2.5 rounded-md text-sm font-semibold"
               >
-                Publier
-              </Link>
-              <Link
-                href="/studio"
-                className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
-              >
-                <BarChart3 size={14} className="text-[#25f4ee]" /> Statistiques
-              </Link>
-              <Link
-                href="/solde"
-                className="inline-block bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
-              >
-                Solde
-              </Link>
-              {!isPro && (
-                <Link
-                  href="/pro"
-                  className="inline-block bg-amber-400/90 text-black px-5 py-2 rounded-md text-sm font-semibold"
-                >
-                  Pro
-                </Link>
-              )}
+                <Share2 size={15} /> Partager le profil
+              </button>
             </>
           ) : (
             <>
@@ -316,53 +305,50 @@ export default function ProfileHeader({
                   initialFollowing={following}
                   onChange={(next) => {
                     setFollowing(next);
-                    setFollowerCount((c) => c + (next ? 1 : -1));
+                    setFollowerCount((count) => count + (next ? 1 : -1));
                   }}
                 />
               ) : (
-                <Link
-                  href="/connexion"
-                  className="bg-[#fe2c55] px-5 py-2 rounded-md text-sm font-semibold"
-                >
+                <Link href="/connexion" className="bg-[#fe2c55] px-5 py-2 rounded-md text-sm font-semibold text-white">
                   Suivre
                 </Link>
               )}
-              {isLoggedIn ? (
-                <Link
-                  href={`/messages/${username}`}
-                  className="bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
-                >
-                  Message
-                </Link>
-              ) : (
-                <Link
-                  href="/connexion"
-                  className="bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
-                >
-                  Message
-                </Link>
-              )}
+              <Link
+                href={isLoggedIn ? `/messages/${username}` : "/connexion"}
+                className="bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+              >
+                Message
+              </Link>
               {isLoggedIn ? (
                 <button
                   type="button"
                   onClick={() => setTipOpen(true)}
-                  className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
+                  className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-4 py-2 rounded-md text-sm font-semibold"
                 >
                   <Gift size={14} className="text-[#fe2c55]" /> Pourboire
                 </button>
               ) : (
-                <Link
-                  href="/connexion"
-                  className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
-                >
+                <Link href="/connexion" className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-4 py-2 rounded-md text-sm font-semibold">
                   <Gift size={14} className="text-[#fe2c55]" /> Pourboire
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-4 py-2 rounded-md text-sm font-semibold"
+              >
+                <Share2 size={14} /> Partager
+              </button>
+              {panneauSlug && (
+                <Link href={`/communaute/${panneauSlug}`} className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-4 py-2 rounded-md text-sm font-semibold">
+                  <Radio size={14} className="text-[#25bcb7] dark:text-[#25f4ee]" /> Panneau
                 </Link>
               )}
               {isLoggedIn && (
                 <button
                   type="button"
-                  onClick={() => setReportOpen((v) => !v)}
-                  className="inline-flex items-center gap-1 bg-white/10 border border-white/15 px-3 py-2 rounded-md text-sm"
+                  onClick={() => setReportOpen((open) => !open)}
+                  className="p-2 bg-white/10 border border-white/15 rounded-md"
                   aria-label="Signaler"
                 >
                   <Flag size={14} />
@@ -373,37 +359,45 @@ export default function ProfileHeader({
                   type="button"
                   disabled={blockBusy}
                   onClick={toggleBlock}
-                  className="inline-flex items-center gap-1 bg-white/10 border border-white/15 px-3 py-2 rounded-md text-sm text-[#fe2c55]"
+                  className="px-3 py-2 bg-white/10 border border-white/15 rounded-md text-sm text-[#fe2c55]"
                 >
                   {blocked ? "Débloquer" : "Bloquer"}
                 </button>
               )}
             </>
           )}
-          <button
-            type="button"
-            onClick={() => setShareOpen(true)}
-            className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
-          >
-            <Share2 size={14} /> Partager
-          </button>
-          {panneauSlug && (
-            <Link
-              href={`/communaute/${panneauSlug}`}
-              className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
-            >
-              <Radio size={14} className="text-[#25f4ee]" /> Panneau
-            </Link>
-          )}
-          {isMe && !panneauSlug && (
-            <Link
-              href="/communautes?creer=1"
-              className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
-            >
-              <Radio size={14} /> Créer un panneau
-            </Link>
-          )}
         </div>
+
+        {isMe && (
+          <div
+            className="mt-3 flex w-full gap-2 overflow-x-auto scrollbar-hide px-1 pb-1 snap-x snap-mandatory"
+            aria-label="Raccourcis du profil"
+          >
+            <Shortcut href="/studio" icon={BarChart3} label="Studio / Statistiques" />
+            <Shortcut href="/solde" icon={WalletCards} label="Solde" />
+            <Shortcut
+              href={panneauSlug ? `/communaute/${panneauSlug}` : "/communautes?creer=1"}
+              icon={Radio}
+              label="Panneau"
+            />
+            <Shortcut href="/fil" icon={LayoutGrid} label="Fil / Publications" />
+            <Shortcut href="/historique" icon={History} label="Historique" />
+            <Shortcut href="/pro" icon={BadgeCheck} label={isPro ? "Pro actif" : "Pro"} />
+            <Shortcut href="/parametres/paiements" icon={CreditCard} label="Paiements" />
+            <button
+              type="button"
+              onClick={() => setPremiumOpen((open) => !open)}
+              aria-expanded={premiumOpen}
+              className={`shrink-0 snap-start inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+                premiumOpen
+                  ? "border-amber-400/50 bg-amber-400/15 text-amber-500"
+                  : "border-white/10 bg-white/10 hover:bg-white/15"
+              }`}
+            >
+              <Crown size={14} /> Premium
+            </button>
+          </div>
+        )}
 
         {playlists.length > 0 && (
           <div className="mt-4 w-full max-w-md text-left">
@@ -465,13 +459,15 @@ export default function ProfileHeader({
           </div>
         )}
 
-        <div className="w-full max-w-md mt-4">
-          <CreatorPremiumPanel
-            username={username}
-            isMe={isMe}
-            isLoggedIn={isLoggedIn}
-          />
-        </div>
+        {(!isMe || premiumOpen) && (
+          <div className="w-full max-w-md mt-4">
+            <CreatorPremiumPanel
+              username={username}
+              isMe={isMe}
+              isLoggedIn={isLoggedIn}
+            />
+          </div>
+        )}
       </div>
 
       <AvatarLightbox
@@ -532,5 +528,26 @@ function Stat({ value, label }: { value: number; label: string }) {
       <p className="font-bold text-lg leading-tight">{formatCount(value)}</p>
       <p className="text-white/45 text-xs">{label}</p>
     </div>
+  );
+}
+
+
+function Shortcut({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: typeof BarChart3;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="shrink-0 snap-start inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"
+    >
+      <Icon size={14} className="text-[#25bcb7] dark:text-[#25f4ee]" />
+      {label}
+    </Link>
   );
 }
