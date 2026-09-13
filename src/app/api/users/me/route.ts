@@ -35,6 +35,18 @@ export async function PATCH(req: NextRequest) {
       if (theme === "light" || theme === "dark") data.theme = theme;
     }
 
+    if ("language" in body) {
+      const language = String(body.language || "").trim().toLowerCase();
+      if (["fr", "en", "zh", "es", "de"].includes(language)) {
+        data.language = language;
+      } else {
+        return NextResponse.json(
+          { error: "Langue invalide (fr, en, es, de, zh)." },
+          { status: 400 }
+        );
+      }
+    }
+
     if ("bio" in body) {
       const bio = body.bio == null ? null : String(body.bio).trim();
       if (bio && bio.length > BIO_MAX_LENGTH) {

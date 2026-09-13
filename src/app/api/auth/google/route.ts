@@ -1,21 +1,30 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { getAppUrl, isGoogleAuthConfigured } from "@/lib/auth";
+import {
+  getGoogleRedirectUri,
+  googleAuthMissingReason,
+  isGoogleAuthConfigured,
+} from "@/lib/auth";
 
 export async function GET() {
-  if (!isGoogleAuthConfigured()) {
+  const missing = googleAuthMissingReason();
+  if (missing || !isGoogleAuthConfigured()) {
     return NextResponse.json(
       {
         error:
-          "Connexion Google non configurée. Ajoutez GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et NEXT_PUBLIC_APP_URL.",
+          missing ||
+          "Connexion Google non configurée. Ajoutez GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et APP_URL.",
+        redirectUri: getGoogleRedirectUri(),
+        hint:
+          "Dans Google Cloud Console > APIs & Services > Identifiants > Client OAuth 2.0, ajoutez exactement cette URI de redirection autorisée.",
       },
       { status: 503 }
     );
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID!;
-  const redirectUri = `${getAppUrl()}/api/auth/google/callback`;
+  const redirectUri = getGoogleRedirectUri();
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,

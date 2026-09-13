@@ -4,11 +4,25 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { ensureUploadDir, uploadPublicUrl } from "@/lib/uploads";
+import { ensureUploadDir, uploadPublicUrl, saveUploadFile } from "@/lib/uploads";
 import type { CommentItem } from "@/lib/types";
+import {
+  MAX_COMMENT_VIDEO_DURATION_SEC,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/limits";
+import {
+  parseClientDuration,
+  resolveDurationSeconds,
+} from "@/lib/duration";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const ALLOWED_VIDEO = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-m4v",
+]);
 
 type DbComment = {
   id: string;
@@ -16,6 +30,7 @@ type DbComment = {
   createdAt: Date;
   parentId: string | null;
   imageUrl: string | null;
+  videoUrl: string | null;
   user: { id: string; username: string; avatarUrl: string | null; isVerified?: boolean; isPro?: boolean; isCreatorSubscriber?: boolean };
   _count: { likes: number };
   likes: { id: string }[];
@@ -28,6 +43,7 @@ function mapComment(c: DbComment, replies: CommentItem[] = []): CommentItem {
     createdAt: c.createdAt.toISOString(),
     parentId: c.parentId,
     imageUrl: c.imageUrl,
+    videoUrl: c.videoUrl,
     likeCount: c._count.likes,
     likedByMe: c.likes.length > 0,
     user: c.user,
@@ -97,7 +113,6 @@ export async function GET(
       },
     })) as unknown as DbComment[];
 
-    // Sort top-level by recent or popular; replies always by createdAt asc (conversation order)
     const nested = nestComments(flat);
 
     if (sort === "popular") {
@@ -134,6 +149,8 @@ async function parseBody(req: NextRequest): Promise<{
   content: string;
   parentId: string | null;
   imageFile: File | null;
+  videoFile: File | null;
+  clientDuration: number | null;
 }> {
   const ct = req.headers.get("content-type") || "";
   if (ct.includes("multipart/form-data")) {
@@ -143,13 +160,17 @@ async function parseBody(req: NextRequest): Promise<{
     const parentId =
       parentRaw && String(parentRaw).trim() ? String(parentRaw).trim() : null;
     const imageFile = (form.get("image") as File | null) || null;
-    return { content, parentId, imageFile };
+    const videoFile = (form.get("video") as File | null) || null;
+    const clientDuration = parseClientDuration(form.get("durationSec"));
+    return { content, parentId, imageFile, videoFile, clientDuration };
   }
   const body = await req.json();
   return {
     content: String(body.content || "").trim(),
     parentId: body.parentId ? String(body.parentId) : null,
     imageFile: null,
+    videoFile: null,
+    clientDuration: null,
   };
 }
 
@@ -163,9 +184,10 @@ export async function POST(
       return NextResponse.json({ error: "Connexion requise." }, { status: 401 });
     }
 
-    const { content, parentId, imageFile } = await parseBody(req);
+    const { content, parentId, imageFile, videoFile, clientDuration } =
+      await parseBody(req);
 
-    if (!content && !imageFile) {
+    if (!content && !imageFile && !videoFile) {
       return NextResponse.json(
         { error: "Commentaire vide." },
         { status: 400 }
@@ -194,7 +216,6 @@ export async function POST(
           { status: 400 }
         );
       }
-      // Flatten deep nests: reply to a reply attaches under the top-level parent
       resolvedParentId = parent.parentId ?? parent.id;
     }
 
@@ -231,10 +252,47 @@ export async function POST(
       imageUrl = uploadPublicUrl("comments", filename);
     }
 
+    let videoUrl: string | null = null;
+    let videoDurationSec: number | null = null;
+    if (videoFile && videoFile.size > 0) {
+      if (videoFile.size > MAX_UPLOAD_BYTES) {
+        return NextResponse.json({ error: "Vidéo trop lourde." }, { status: 400 });
+      }
+      const mime = videoFile.type || "";
+      const extFromName = path.extname(videoFile.name).toLowerCase();
+      const okExt = [".mp4", ".webm", ".mov", ".m4v"].includes(extFromName);
+      if (!ALLOWED_VIDEO.has(mime) && !okExt) {
+        return NextResponse.json(
+          { error: "Formats vidéo acceptés : MP4, WebM, MOV." },
+          { status: 400 }
+        );
+      }
+      const ext =
+        extFromName ||
+        (mime.includes("webm") ? ".webm" : mime.includes("quicktime") ? ".mov" : ".mp4");
+      const filename = `${randomUUID()}${ext}`;
+      const dir = await ensureUploadDir("comments");
+      const fullPath = path.join(dir, filename);
+      await saveUploadFile(videoFile, fullPath);
+      const duration = await resolveDurationSeconds(fullPath, clientDuration);
+      if (duration != null && duration > MAX_COMMENT_VIDEO_DURATION_SEC + 0.5) {
+        return NextResponse.json(
+          {
+            error: `Vidéo trop longue (max ${MAX_COMMENT_VIDEO_DURATION_SEC}s).`,
+          },
+          { status: 400 }
+        );
+      }
+      videoUrl = uploadPublicUrl("comments", filename);
+      videoDurationSec = duration;
+    }
+
     const comment = await prisma.comment.create({
       data: {
         content: content,
         imageUrl,
+        videoUrl,
+        videoDurationSec,
         userId: session.id,
         videoId: params.id,
         parentId: resolvedParentId,
@@ -251,6 +309,7 @@ export async function POST(
       createdAt: comment.createdAt.toISOString(),
       parentId: comment.parentId,
       imageUrl: comment.imageUrl,
+      videoUrl: comment.videoUrl,
       likeCount: 0,
       likedByMe: false,
       user: comment.user,

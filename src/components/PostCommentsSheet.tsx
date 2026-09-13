@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { MessageCircle, Send, X } from "lucide-react";
+import { ImagePlus, MessageCircle, Send, Video, X } from "lucide-react";
 import Avatar from "./Avatar";
 import { formatRelativeFr } from "@/lib/time";
+import { assertVideoMaxDuration } from "@/lib/media-duration-client";
+import { MAX_COMMENT_VIDEO_DURATION_SEC } from "@/lib/limits";
 
 type SheetPost = {
   id: string;
@@ -15,6 +17,8 @@ type SheetPost = {
 type Comment = {
   id: string;
   content: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
   createdAt: string;
   user: {
     id: string;
@@ -36,7 +40,13 @@ export default function PostCommentsSheet({ post, onClose, onCommentAdded }: Pro
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,6 +55,8 @@ export default function PostCommentsSheet({ post, onClose, onCommentAdded }: Pro
     setLoading(true);
     setError("");
     setComments([]);
+    setImageFile(null);
+    setVideoFile(null);
     fetch(`/api/posts/${post.id}/comments`, { credentials: "include" })
       .then(async (res) => {
         const data = await res.json();
@@ -68,18 +80,78 @@ export default function PostCommentsSheet({ post, onClose, onCommentAdded }: Pro
     return () => window.removeEventListener("keydown", onKey);
   }, [post, onClose]);
 
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
+  useEffect(() => {
+    if (!videoFile) {
+      setVideoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(videoFile);
+    setVideoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [videoFile]);
+
+  async function onPickVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] || null;
+    e.target.value = "";
+    if (!f) return;
+    try {
+      await assertVideoMaxDuration(f, MAX_COMMENT_VIDEO_DURATION_SEC);
+      setVideoFile(f);
+      setImageFile(null);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Vidéo invalide.");
+    }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!post || !text.trim() || sending) return;
+    if (!post || sending) return;
+    if (!text.trim() && !imageFile && !videoFile) return;
     setSending(true);
     setError("");
     try {
-      const res = await fetch(`/api/posts/${post.id}/comments`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text.trim() }),
-      });
+      let res: Response;
+      if (imageFile || videoFile) {
+        const form = new FormData();
+        form.append("content", text.trim());
+        if (imageFile) form.append("image", imageFile);
+        if (videoFile) {
+          form.append("video", videoFile);
+          try {
+            const d = await assertVideoMaxDuration(
+              videoFile,
+              MAX_COMMENT_VIDEO_DURATION_SEC
+            );
+            form.append("durationSec", String(d));
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Vidéo invalide.");
+            return;
+          }
+        }
+        res = await fetch(`/api/posts/${post.id}/comments`, {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        });
+      } else {
+        res = await fetch(`/api/posts/${post.id}/comments`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: text.trim() }),
+        });
+      }
       if (res.status === 401) {
         window.location.href = `/connexion?next=/fil%23${post.id}`;
         return;
@@ -91,8 +163,12 @@ export default function PostCommentsSheet({ post, onClose, onCommentAdded }: Pro
       }
       setComments((current) => [...current, data.comment]);
       setText("");
+      setImageFile(null);
+      setVideoFile(null);
       onCommentAdded(post.id);
-      requestAnimationFrame(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" }));
+      requestAnimationFrame(() =>
+        listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" })
+      );
     } finally {
       setSending(false);
     }
@@ -148,7 +224,25 @@ export default function PostCommentsSheet({ post, onClose, onCommentAdded }: Pro
                     {formatRelativeFr(comment.createdAt)}
                   </time>
                 </div>
-                <p className="mt-0.5 whitespace-pre-wrap break-words text-sm">{comment.content}</p>
+                {comment.content && (
+                  <p className="mt-0.5 whitespace-pre-wrap break-words text-sm">{comment.content}</p>
+                )}
+                {comment.videoUrl && (
+                  <video
+                    src={comment.videoUrl}
+                    controls
+                    playsInline
+                    className="mt-2 max-h-48 w-full rounded-xl bg-black border border-white/10"
+                  />
+                )}
+                {comment.imageUrl && !comment.videoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={comment.imageUrl}
+                    alt=""
+                    className="mt-2 max-h-48 rounded-xl object-cover border border-white/10"
+                  />
+                )}
               </div>
             </article>
           ))}
@@ -156,7 +250,64 @@ export default function PostCommentsSheet({ post, onClose, onCommentAdded }: Pro
 
         <form onSubmit={submit} className="shrink-0 border-t border-white/10 bg-[var(--nav)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {error && <p className="mb-2 text-xs text-[#fe2c55]">{error}</p>}
+          {(imagePreview || videoPreview) && (
+            <div className="mb-2 flex items-center gap-2">
+              {imagePreview && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imagePreview} alt="" className="h-14 w-14 rounded-lg object-cover border border-white/10" />
+              )}
+              {videoPreview && (
+                <video src={videoPreview} className="h-14 w-20 rounded-lg object-cover border border-white/10 bg-black" muted />
+              )}
+              <button
+                type="button"
+                className="text-xs text-white/50 hover:text-white"
+                onClick={() => {
+                  setImageFile(null);
+                  setVideoFile(null);
+                }}
+              >
+                Retirer
+              </button>
+            </div>
+          )}
           <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => imageRef.current?.click()}
+              className="shrink-0 rounded-full p-2.5 bg-white/10 hover:bg-white/15"
+              aria-label="Joindre une image"
+            >
+              <ImagePlus size={18} />
+            </button>
+            <input
+              ref={imageRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                setImageFile(f);
+                if (f) setVideoFile(null);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => videoRef.current?.click()}
+              className="shrink-0 rounded-full p-2.5 bg-white/10 hover:bg-white/15"
+              aria-label="Joindre une vidéo (max 1 min)"
+              title="Vidéo max 1 minute"
+            >
+              <Video size={18} />
+            </button>
+            <input
+              ref={videoRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              className="hidden"
+              onChange={onPickVideo}
+            />
             <input
               ref={inputRef}
               value={text}
@@ -168,7 +319,7 @@ export default function PostCommentsSheet({ post, onClose, onCommentAdded }: Pro
             />
             <button
               type="submit"
-              disabled={sending || !text.trim()}
+              disabled={sending || (!text.trim() && !imageFile && !videoFile)}
               className="shrink-0 rounded-full bg-[#fe2c55] p-2.5 text-white disabled:opacity-40"
               aria-label="Publier le commentaire"
             >

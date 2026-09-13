@@ -60,13 +60,27 @@ export const COUNTRIES: { code: string; name: string }[] = [
   { code: "US", name: "États-Unis" },
   { code: "GB", name: "Royaume-Uni" },
   { code: "CN", name: "Chine" },
+  { code: "ES", name: "Espagne" },
+  { code: "DE", name: "Allemagne" },
   { code: "OTHER", name: "Autre" },
 ];
 
 export const LANG_OPTIONS = [
   { code: "fr", label: "Français" },
   { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+  { code: "de", label: "Deutsch" },
   { code: "zh", label: "中文" },
 ] as const;
 
-export type UiLang = "fr" | "en" | "zh";
+export type UiLang = (typeof LANG_OPTIONS)[number]["code"];
+
+export const UI_LANGS = LANG_OPTIONS.map((l) => l.code) as UiLang[];
+
+export function isUiLang(v: unknown): v is UiLang {
+  return typeof v === "string" && (UI_LANGS as string[]).includes(v);
+}
+
+export function normalizeUiLang(v: unknown, fallback: UiLang = "fr"): UiLang {
+  return isUiLang(v) ? v : fallback;
+}

@@ -13,6 +13,7 @@ import {
   Heart,
   Smile,
   ImagePlus,
+  Video,
   SendHorizontal,
   ChevronDown,
   ChevronUp,
@@ -23,6 +24,8 @@ import type { CommentItem } from "@/lib/types";
 import { formatRelativeFr } from "@/lib/time";
 import { LinkifiedText } from "@/lib/linkify";
 import Link from "next/link";
+import { assertVideoMaxDuration } from "@/lib/media-duration-client";
+import { MAX_COMMENT_VIDEO_DURATION_SEC } from "@/lib/limits";
 
 type Props = {
   videoId: string;
@@ -80,6 +83,8 @@ export default function CommentPanel({
   const [showEmoji, setShowEmoji] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>(
     {}
   );
@@ -88,6 +93,7 @@ export default function CommentPanel({
   const [mentionQuery, setMentionQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoFileRef = useRef<HTMLInputElement>(null);
   const likingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -155,6 +161,16 @@ export default function CommentPanel({
     setImagePreview(url);
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
+
+  useEffect(() => {
+    if (!videoFile) {
+      setVideoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(videoFile);
+    setVideoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [videoFile]);
 
   // Mention typeahead when typing @
   useEffect(() => {
@@ -297,16 +313,30 @@ export default function CommentPanel({
       setError("Connectez-vous pour commenter.");
       return;
     }
-    if (!text.trim() && !imageFile) return;
+    if (!text.trim() && !imageFile && !videoFile) return;
     setLoading(true);
     setError("");
     try {
       let res: Response;
-      if (imageFile) {
+      if (imageFile || videoFile) {
         const form = new FormData();
         form.append("content", text.trim());
         if (replyTo) form.append("parentId", replyTo.id);
-        form.append("image", imageFile);
+        if (imageFile) form.append("image", imageFile);
+        if (videoFile) {
+          try {
+            const d = await assertVideoMaxDuration(
+              videoFile,
+              MAX_COMMENT_VIDEO_DURATION_SEC
+            );
+            form.append("video", videoFile);
+            form.append("durationSec", String(d));
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Vidéo invalide.");
+            setLoading(false);
+            return;
+          }
+        }
         res = await fetch(`/api/videos/${videoId}/comments`, {
           method: "POST",
           credentials: "include",
@@ -339,6 +369,7 @@ export default function CommentPanel({
       setText("");
       setReplyTo(null);
       setImageFile(null);
+      setVideoFile(null);
       setShowEmoji(false);
       setMentionOpen(false);
       onCommentAdded();
@@ -400,7 +431,15 @@ export default function CommentPanel({
                 <p className="text-sm text-white break-words mt-0.5 whitespace-pre-wrap">
                   <LinkifiedText text={c.content.trim()} />
                 </p>
-                {c.imageUrl && (
+                {c.videoUrl && (
+                  <video
+                    src={c.videoUrl}
+                    controls
+                    playsInline
+                    className="mt-2 max-h-48 w-full rounded-xl bg-black border border-white/10"
+                  />
+                )}
+                {c.imageUrl && !c.videoUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={c.imageUrl}
@@ -584,17 +623,29 @@ export default function CommentPanel({
                 </div>
               )}
 
-              {imagePreview && (
+              {(imagePreview || videoPreview) && (
                 <div className="px-4 pt-2 flex items-start gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imagePreview}
-                    alt="Aperçu"
-                    className="h-16 w-16 rounded-lg object-cover border border-white/10"
-                  />
+                  {imagePreview && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imagePreview}
+                      alt="Aperçu"
+                      className="h-16 w-16 rounded-lg object-cover border border-white/10"
+                    />
+                  )}
+                  {videoPreview && (
+                    <video
+                      src={videoPreview}
+                      className="h-16 w-24 rounded-lg object-cover border border-white/10 bg-black"
+                      muted
+                    />
+                  )}
                   <button
                     type="button"
-                    onClick={() => setImageFile(null)}
+                    onClick={() => {
+                      setImageFile(null);
+                      setVideoFile(null);
+                    }}
                     className="text-xs text-white/50 hover:text-white"
                   >
                     Retirer
@@ -692,13 +743,47 @@ export default function CommentPanel({
                     onChange={(e) => {
                       const f = e.target.files?.[0] || null;
                       setImageFile(f);
+                      if (f) setVideoFile(null);
                       e.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => videoFileRef.current?.click()}
+                    className="p-1.5 rounded-full hover:bg-white/10 text-white/60"
+                    aria-label="Joindre une vidéo (max 1 min)"
+                    title="Vidéo max 1 minute"
+                  >
+                    <Video size={18} />
+                  </button>
+                  <input
+                    ref={videoFileRef}
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0] || null;
+                      e.target.value = "";
+                      if (!f) return;
+                      try {
+                        await assertVideoMaxDuration(
+                          f,
+                          MAX_COMMENT_VIDEO_DURATION_SEC
+                        );
+                        setVideoFile(f);
+                        setImageFile(null);
+                        setError("");
+                      } catch (err) {
+                        setError(
+                          err instanceof Error ? err.message : "Vidéo invalide."
+                        );
+                      }
                     }}
                   />
                 </div>
                 <button
                   type="submit"
-                  disabled={(!text.trim() && !imageFile) || loading}
+                  disabled={(!text.trim() && !imageFile && !videoFile) || loading}
                   className="shrink-0 p-2.5 bg-[#fe2c55] hover:bg-[#e0264c] disabled:opacity-40 disabled:hover:bg-[#fe2c55] rounded-full transition"
                   aria-label="Envoyer"
                 >

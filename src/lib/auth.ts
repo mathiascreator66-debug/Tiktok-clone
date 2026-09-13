@@ -6,6 +6,12 @@ import { prisma } from "./prisma";
 const COOKIE_NAME = "afrivoix_session";
 const SESSION_DAYS = 7;
 
+function sessionCookieSecure() {
+  if (process.env.NODE_ENV === "production") return true;
+  const url = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "";
+  return url.startsWith("https://");
+}
+
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error("AUTH_SECRET manquant");
@@ -42,7 +48,7 @@ export async function createSession(user: SessionUser) {
   cookies().set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(),
     path: "/",
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   });
@@ -52,7 +58,7 @@ export async function destroySession() {
   cookies().set(COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(),
     path: "/",
     maxAge: 0,
   });
@@ -172,9 +178,9 @@ export async function requireModerator() {
 
 export function isGoogleAuthConfigured() {
   return Boolean(
-    process.env.GOOGLE_CLIENT_ID &&
-      process.env.GOOGLE_CLIENT_SECRET &&
-      (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL)
+    process.env.GOOGLE_CLIENT_ID?.trim() &&
+      process.env.GOOGLE_CLIENT_SECRET?.trim() &&
+      (process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim())
   );
 }
 
@@ -184,6 +190,24 @@ export function getAppUrl() {
     process.env.NEXT_PUBLIC_APP_URL ||
     "http://localhost:3000"
   ).replace(/\/$/, "");
+}
+
+/** Exact URI to whitelist in Google Cloud Console > Credentials > OAuth client. */
+export function getGoogleRedirectUri() {
+  return `${getAppUrl()}/api/auth/google/callback`;
+}
+
+export function googleAuthMissingReason(): string | null {
+  if (!process.env.GOOGLE_CLIENT_ID?.trim()) {
+    return "GOOGLE_CLIENT_ID manquant dans .env";
+  }
+  if (!process.env.GOOGLE_CLIENT_SECRET?.trim()) {
+    return "GOOGLE_CLIENT_SECRET manquant dans .env";
+  }
+  if (!process.env.APP_URL?.trim() && !process.env.NEXT_PUBLIC_APP_URL?.trim()) {
+    return "APP_URL / NEXT_PUBLIC_APP_URL manquant dans .env";
+  }
+  return null;
 }
 
 export function ageFromBirthdate(birthdate: Date, now = new Date()): number {

@@ -29,7 +29,7 @@ model User {
   /// ACTIVE | SUSPENDED | BANNED
   accountStatus String          @default("ACTIVE")
   country       String?
-  /// fr | en | zh
+  /// fr | en | zh | es | de
   language      String          @default("fr")
   /// light | dark
   theme         String          @default("light")
@@ -168,6 +168,9 @@ model Comment {
   createdAt DateTime      @default(now())
   content   String
   imageUrl  String?
+  videoUrl  String?
+  /// Duration of attached comment video (seconds); max 60
+  videoDurationSec Float?
   userId    String
   videoId   String
   parentId  String?
@@ -599,6 +602,8 @@ model CommunityPost {
   content     String
   imageUrl    String?
   videoUrl    String?
+  /// Duration of attached video (seconds); max 60 for panneau
+  durationSec Float?
   viewCount   Int                    @default(0)
   pinnedAt    DateTime?
   createdAt   DateTime               @default(now())
@@ -724,6 +729,10 @@ model PostComment {
   postId    String
   userId    String
   content   String
+  imageUrl  String?
+  videoUrl  String?
+  /// Duration of attached comment video (seconds); max 60
+  videoDurationSec Float?
   createdAt DateTime @default(now())
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

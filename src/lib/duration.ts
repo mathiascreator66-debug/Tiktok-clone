@@ -6,6 +6,8 @@ const execFileAsync = promisify(execFile);
 /** Videos max 8 minutes; stories max 3 minutes */
 export const MAX_VIDEO_DURATION_SEC = 8 * 60;
 export const MAX_STORY_DURATION_SEC = 3 * 60;
+export const MAX_COMMENT_VIDEO_DURATION_SEC = 60;
+export const MAX_PANNEAU_VIDEO_DURATION_SEC = 60;
 
 /**
  * Probe duration with ffprobe if available.

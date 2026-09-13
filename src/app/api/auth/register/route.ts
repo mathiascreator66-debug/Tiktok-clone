@@ -7,7 +7,7 @@ import { MIN_AGE } from "@/lib/limits";
 import { COUNTRIES } from "@/lib/countries";
 import { normalizePhoneE164, looksLikeEmail } from "@/lib/phone";
 
-const LANGS = new Set(["fr", "en", "zh"]);
+const LANGS = new Set(["fr", "en", "zh", "es", "de"]);
 const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
 
 export async function POST(req: NextRequest) {
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
     if (!LANGS.has(language)) {
       return NextResponse.json(
-        { error: "Langue invalide (fr, en ou zh)." },
+        { error: "Langue invalide (fr, en, es, de ou zh)." },
         { status: 400 }
       );
     }

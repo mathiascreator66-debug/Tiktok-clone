@@ -5,15 +5,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import BrandLogo from "./BrandLogo";
 import { COUNTRIES, LANG_OPTIONS } from "@/lib/countries";
+import { useI18n } from "@/lib/i18n";
 
 type Mode = "login" | "register";
 type IdMethod = "email" | "phone";
 
 const GOOGLE_ERRORS: Record<string, string> = {
-  google_non_configure: "Connexion Google non configurée sur ce serveur.",
+  google_non_configure:
+    "Connexion Google non configurée. Vérifiez GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et APP_URL dans .env.",
   google_annule: "Connexion Google annulée.",
   google_echec: "Échec de la connexion Google. Réessayez.",
   google_email_requis: "Google n'a pas fourni d'email.",
+  google_redirect_mismatch:
+    "URI de redirection Google incorrecte. Dans Google Cloud Console, autorisez exactement : {APP_URL}/api/auth/google/callback (voir .env APP_URL).",
 };
 
 export default function AuthForm({
@@ -39,6 +43,7 @@ export default function AuthForm({
     () => GOOGLE_ERRORS[searchParams.get("erreur") || ""] || ""
   );
   const [loading, setLoading] = useState(false);
+  const { t } = useI18n();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -122,7 +127,7 @@ export default function AuthForm({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Continuer avec Google
+            {t("continueGoogle")}
           </a>
         ) : (
           <button
@@ -131,12 +136,13 @@ export default function AuthForm({
             title="Ajoutez GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et APP_URL dans .env"
             className="w-full flex items-center justify-center gap-2 bg-white/10 text-white/40 rounded-full py-2.5 font-semibold text-sm cursor-not-allowed"
           >
-            Continuer avec Google
+            {t("continueGoogle")}
           </button>
         )}
         {!googleEnabled && (
           <p className="text-[11px] text-white/35 text-center -mt-2">
-            Google non configuré — voir README / .env.example
+            Google non configuré — ajoutez GOOGLE_CLIENT_ID / SECRET et APP_URL.
+            URI à autoriser : {"{APP_URL}"}/api/auth/google/callback
           </p>
         )}
 

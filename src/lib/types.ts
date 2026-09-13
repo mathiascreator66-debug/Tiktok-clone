@@ -66,6 +66,7 @@ export type CommentItem = {
   createdAt: string;
   parentId: string | null;
   imageUrl: string | null;
+  videoUrl: string | null;
   likeCount: number;
   likedByMe: boolean;
   user: CommentUser;

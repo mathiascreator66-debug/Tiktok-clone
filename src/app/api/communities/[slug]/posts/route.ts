@@ -4,7 +4,14 @@ import path from "path";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { ensureUploadDir, saveUploadFile } from "@/lib/uploads";
-import { MAX_UPLOAD_BYTES } from "@/lib/limits";
+import {
+  MAX_PANNEAU_VIDEO_DURATION_SEC,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/limits";
+import {
+  parseClientDuration,
+  resolveDurationSeconds,
+} from "@/lib/duration";
 
 type Ctx = { params: { slug: string } };
 
@@ -40,6 +47,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     let content = "";
     let imageUrl: string | null = null;
     let videoUrl: string | null = null;
+    let durationSec: number | null = null;
 
     if (ct.includes("multipart/form-data")) {
       const form = await req.formData();
@@ -60,11 +68,23 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         if (video.size > MAX_UPLOAD_BYTES) {
           return NextResponse.json({ error: "Vidéo trop lourde." }, { status: 400 });
         }
+        const clientDuration = parseClientDuration(form.get("durationSec"));
         const ext = path.extname(video.name) || ".mp4";
         const name = `${randomUUID()}${ext}`;
         const dir = await ensureUploadDir("panneau");
-        await saveUploadFile(video, path.join(dir, name));
+        const fullPath = path.join(dir, name);
+        await saveUploadFile(video, fullPath);
+        const duration = await resolveDurationSeconds(fullPath, clientDuration);
+        if (duration != null && duration > MAX_PANNEAU_VIDEO_DURATION_SEC + 0.5) {
+          return NextResponse.json(
+            {
+              error: `Vidéo trop longue (max ${MAX_PANNEAU_VIDEO_DURATION_SEC}s).`,
+            },
+            { status: 400 }
+          );
+        }
         videoUrl = `/uploads/panneau/${name}`;
+        durationSec = duration;
       }
     } else {
       const body = await req.json();
@@ -87,6 +107,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         content: content || "",
         imageUrl,
         videoUrl,
+        durationSec,
       },
       include: {
         author: {

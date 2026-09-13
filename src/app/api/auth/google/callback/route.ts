@@ -2,7 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createSession, getAppUrl, isGoogleAuthConfigured } from "@/lib/auth";
+import {
+  createSession,
+  getAppUrl,
+  getGoogleRedirectUri,
+  isGoogleAuthConfigured,
+} from "@/lib/auth";
 
 function redirectError(message: string) {
   const url = new URL("/connexion", getAppUrl());
@@ -35,13 +40,16 @@ export async function GET(req: NextRequest) {
 
   const code = req.nextUrl.searchParams.get("code");
   const oauthError = req.nextUrl.searchParams.get("error");
+  if (oauthError === "access_denied") {
+    return redirectError("google_annule");
+  }
   if (oauthError || !code) {
     return redirectError("google_annule");
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID!;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-  const redirectUri = `${getAppUrl()}/api/auth/google/callback`;
+  const redirectUri = getGoogleRedirectUri();
 
   try {
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -57,7 +65,17 @@ export async function GET(req: NextRequest) {
     });
 
     if (!tokenRes.ok) {
-      console.error("Google token error", await tokenRes.text());
+      const errText = await tokenRes.text();
+      console.error("Google token error", errText, "redirect_uri=", redirectUri);
+      if (
+        /redirect_uri_mismatch/i.test(errText) ||
+        /redirect_uri/i.test(errText)
+      ) {
+        return redirectError("google_redirect_mismatch");
+      }
+      if (/invalid_client/i.test(errText)) {
+        return redirectError("google_non_configure");
+      }
       return redirectError("google_echec");
     }
 

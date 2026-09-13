@@ -60,11 +60,29 @@ Voir `.env.example` :
 
 Ne committez jamais `.env`.
 
+
+## Google OAuth (« Continuer avec Google »)
+
+1. Créez un client OAuth **Application Web** dans [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+2. Ajoutez **exactement** cette URI de redirection autorisée (sans slash final sur le domaine) :
+
+```
+https://september-henderson-tampa-abroad.trycloudflare.com/api/auth/google/callback
+```
+
+   En local : `http://localhost:3000/api/auth/google/callback`
+
+3. Copiez Client ID / Secret dans `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`).
+4. `APP_URL` et `NEXT_PUBLIC_APP_URL` doivent correspondre au même domaine que l’URI ci-dessus.
+5. Redémarrez `npm run dev` après tout changement d’URL / clés.
+
+Si erreur `redirect_uri_mismatch` : l’URI dans la console Google ne correspond pas à `{APP_URL}/api/auth/google/callback`.
+
 ## WAVE 1 — livré
 
 - Rebrand **AfriVoix** + logo officiel (`/public/brand/`)
 - `/a-propos`, `/cgu`, `/confidentialite`, `/aide` (+ HelpTicket)
-- Inscription : pays, langue (fr|en|zh), naissance (13+), téléphone optionnel, acceptation CGU
+- Inscription : pays, langue (fr|en|es|de|zh), naissance (13+), téléphone optionnel, acceptation CGU
 - Admin `/admin` : rôles admin/modo, ACTIVE|SUSPENDED|BANNED, reports, journal AdminAction
 - Signalements video|user|comment|story
 - Hashtags (parse légende, recherche `#tag`)
@@ -72,7 +90,7 @@ Ne committez jamais `.env`.
 - Durées : vidéos **8 min**, stories **3 min** (client + serveur / ffprobe)
 - Liens cliquables (http(s), #, @) dans légendes / commentaires
 - Rate limiting login/register/tips ; logs sanitizés
-- i18n UI fr/en/zh (nav + paramètres)
+- i18n UI fr/en/es/de/zh (nav + paramètres + profil/auth)
 
 ## Hors WAVE 1 / phase 2
 

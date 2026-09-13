@@ -6,6 +6,9 @@ export const MAX_UPLOAD_LABEL = "100 Mo";
 /** Duration caps (WAVE 1) */
 export const MAX_VIDEO_DURATION_SEC = 8 * 60; // 8 minutes
 export const MAX_STORY_DURATION_SEC = 3 * 60; // 3 minutes
+/** Panneau / comment attached videos */
+export const MAX_COMMENT_VIDEO_DURATION_SEC = 60;
+export const MAX_PANNEAU_VIDEO_DURATION_SEC = 60;
 export const MIN_AGE = 13;
 
 /** Bio max — must stay ≥ 250. */

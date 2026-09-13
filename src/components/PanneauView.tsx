@@ -16,6 +16,8 @@ import {
 import Avatar from "./Avatar";
 import { formatCount } from "@/lib/format";
 import { formatRelativeFr } from "@/lib/time";
+import { assertVideoMaxDuration } from "@/lib/media-duration-client";
+import { MAX_PANNEAU_VIDEO_DURATION_SEC } from "@/lib/limits";
 
 type Post = {
   id: string;
@@ -143,10 +145,16 @@ export default function PanneauView({ slug }: { slug: string }) {
   async function onPickVideo(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    const form = new FormData();
-    form.append("content", text.trim());
-    form.append("video", f);
-    await publish(form);
+    try {
+      const duration = await assertVideoMaxDuration(f, MAX_PANNEAU_VIDEO_DURATION_SEC);
+      const form = new FormData();
+      form.append("content", text.trim());
+      form.append("video", f);
+      form.append("durationSec", String(duration));
+      await publish(form);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Vidéo invalide.");
+    }
     e.target.value = "";
   }
 
@@ -368,7 +376,7 @@ export default function PanneauView({ slug }: { slug: string }) {
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Écrire une actu…"
+              placeholder="Écrire une actu… (photo / vidéo ≤ 1 min)"
               maxLength={2000}
               className="min-w-0 flex-1 bg-white/10 rounded-full px-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#25f4ee]/40"
             />

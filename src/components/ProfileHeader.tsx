@@ -31,6 +31,7 @@ import { formatCount } from "@/lib/format";
 import type { StoryGroup } from "@/lib/types";
 import ProfileShareSheet from "./ProfileShareSheet";
 import AvatarLightbox from "./AvatarLightbox";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
   username: string;
@@ -84,6 +85,7 @@ export default function ProfileHeader({
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
+  const { t } = useI18n();
 
   const loadStories = useCallback(async () => {
     try {
@@ -236,10 +238,42 @@ export default function ProfileHeader({
         <p className="text-white/50 text-sm">@{username}</p>
 
         <div className="flex gap-8 mt-4">
-          <Stat value={followingCount} label="Suivis" />
-          <Stat value={followerCount} label="Followers" />
-          <Stat value={likeCount} label="J'aime" />
+          <Stat value={followingCount} label={t("following")} />
+          <Stat value={followerCount} label={t("followers")} />
+          <Stat value={likeCount} label={t("likes")} />
         </div>
+
+        {isMe && (
+          <div
+            className="mt-3 flex w-full max-w-md gap-2 overflow-x-auto scrollbar-hide px-1 pb-1 snap-x snap-mandatory"
+            aria-label="Raccourcis du profil"
+          >
+            <Shortcut href="/studio" icon={BarChart3} label="Studio / Statistiques" />
+            <Shortcut href="/solde" icon={WalletCards} label="Solde" />
+            <Shortcut
+              href={panneauSlug ? `/communaute/${panneauSlug}` : "/communautes?creer=1"}
+              icon={Radio}
+              label="Panneau"
+            />
+            <Shortcut href="/fil" icon={LayoutGrid} label="Fil / Publications" />
+            <Shortcut href="/historique" icon={History} label="Historique" />
+            <Shortcut href="/pro" icon={BadgeCheck} label={isPro ? "Pro actif" : "Pro"} />
+            <Shortcut href="/parametres/paiements" icon={CreditCard} label="Paiements" />
+            <button
+              type="button"
+              onClick={() => setPremiumOpen((open) => !open)}
+              aria-expanded={premiumOpen}
+              className={`shrink-0 snap-start inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+                premiumOpen
+                  ? "border-amber-400/50 bg-amber-400/15 text-amber-500"
+                  : "border-white/10 bg-white/10 hover:bg-white/15"
+              }`}
+            >
+              <Crown size={14} /> Premium
+            </button>
+          </div>
+        )}
+
 
         {bio ? (
           <p className="text-white/75 text-sm mt-3 max-w-md whitespace-pre-wrap px-2">
@@ -287,14 +321,14 @@ export default function ProfileHeader({
                 href={`/profil/${username}/modifier`}
                 className="flex-1 bg-white/10 hover:bg-white/15 border border-white/15 px-4 py-2.5 rounded-md text-sm font-semibold"
               >
-                Modifier le profil
+                {t("editProfile")}
               </Link>
               <button
                 type="button"
                 onClick={() => setShareOpen(true)}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 border border-white/15 px-4 py-2.5 rounded-md text-sm font-semibold"
               >
-                <Share2 size={15} /> Partager le profil
+                <Share2 size={15} /> {t("shareProfile")}
               </button>
             </>
           ) : (
@@ -367,37 +401,6 @@ export default function ProfileHeader({
             </>
           )}
         </div>
-
-        {isMe && (
-          <div
-            className="mt-3 flex w-full gap-2 overflow-x-auto scrollbar-hide px-1 pb-1 snap-x snap-mandatory"
-            aria-label="Raccourcis du profil"
-          >
-            <Shortcut href="/studio" icon={BarChart3} label="Studio / Statistiques" />
-            <Shortcut href="/solde" icon={WalletCards} label="Solde" />
-            <Shortcut
-              href={panneauSlug ? `/communaute/${panneauSlug}` : "/communautes?creer=1"}
-              icon={Radio}
-              label="Panneau"
-            />
-            <Shortcut href="/fil" icon={LayoutGrid} label="Fil / Publications" />
-            <Shortcut href="/historique" icon={History} label="Historique" />
-            <Shortcut href="/pro" icon={BadgeCheck} label={isPro ? "Pro actif" : "Pro"} />
-            <Shortcut href="/parametres/paiements" icon={CreditCard} label="Paiements" />
-            <button
-              type="button"
-              onClick={() => setPremiumOpen((open) => !open)}
-              aria-expanded={premiumOpen}
-              className={`shrink-0 snap-start inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
-                premiumOpen
-                  ? "border-amber-400/50 bg-amber-400/15 text-amber-500"
-                  : "border-white/10 bg-white/10 hover:bg-white/15"
-              }`}
-            >
-              <Crown size={14} /> Premium
-            </button>
-          </div>
-        )}
 
         {playlists.length > 0 && (
           <div className="mt-4 w-full max-w-md text-left">

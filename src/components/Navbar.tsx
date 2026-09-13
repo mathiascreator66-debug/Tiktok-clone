@@ -95,7 +95,7 @@ export default function Navbar({ user, initialUnread = 0, isStaff = false }: Pro
             href="/"
             className={`hover:text-[#fe2c55] ${isHome ? "text-[#fe2c55]" : "text-white/80"}`}
           >
-            Pour toi
+            {t("forYou")}
           </Link>
           <Link
             href="/recherche"
