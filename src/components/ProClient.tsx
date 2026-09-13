@@ -139,8 +139,8 @@ export default function ProClient({ username }: { username: string }) {
         />
         <Benefit
           icon={<BarChart3 size={20} className="text-[#25f4ee]" />}
-          title="Analytics (aperçu)"
-          desc="Teaser statistiques créateur — à venir"
+          title="Analytics créateur"
+          desc="Tableau de bord /studio — vues, engagement, spectateurs"
         />
       </ul>
 

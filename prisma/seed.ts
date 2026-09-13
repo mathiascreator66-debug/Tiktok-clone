@@ -115,6 +115,8 @@ async function main() {
       displayName: "Démo",
       balanceCents: 1000,
       isVerified: true,
+      country: "SN",
+      birthdate: new Date("1995-06-15"),
     },
     create: {
       email: "demo@afrivoix.local",
@@ -124,6 +126,8 @@ async function main() {
       displayName: "Démo",
       balanceCents: 1000,
       isVerified: true,
+      country: "SN",
+      birthdate: new Date("1995-06-15"),
     },
   });
 
@@ -134,6 +138,8 @@ async function main() {
       displayName: "Alice",
       balanceCents: 500,
       isVerified: true,
+      country: "CI",
+      birthdate: new Date("1998-03-22"),
     },
     create: {
       email: "alice@afrivoix.local",
@@ -143,6 +149,8 @@ async function main() {
       displayName: "Alice",
       balanceCents: 500,
       isVerified: true,
+      country: "CI",
+      birthdate: new Date("1998-03-22"),
     },
   });
 
@@ -151,6 +159,8 @@ async function main() {
     update: {
       bio: "Fan de cinéma open source 🎞️",
       displayName: "Bob",
+      country: "CM",
+      birthdate: new Date("1990-11-08"),
     },
     create: {
       email: "bob@afrivoix.local",
@@ -158,6 +168,8 @@ async function main() {
       passwordHash,
       bio: "Fan de cinéma open source 🎞️",
       displayName: "Bob",
+      country: "CM",
+      birthdate: new Date("1990-11-08"),
     },
   });
 
@@ -166,6 +178,8 @@ async function main() {
     update: {
       bio: "Nouveau sur AfriVoix — suggestions & demandes",
       displayName: "Charlie",
+      country: "NG",
+      birthdate: new Date("2001-01-30"),
     },
     create: {
       email: "charlie@afrivoix.local",
@@ -173,6 +187,8 @@ async function main() {
       passwordHash,
       bio: "Nouveau sur AfriVoix — suggestions & demandes",
       displayName: "Charlie",
+      country: "NG",
+      birthdate: new Date("2001-01-30"),
     },
   });
 
@@ -411,12 +427,17 @@ async function main() {
   }
 
   const now = Date.now();
+  // Historique démo (viewer = demo)
   if (videosAfter[1]) {
     await prisma.watchEvent.create({
       data: {
         userId: demo.id,
         videoId: videosAfter[1].id,
         watchedAt: new Date(now - 60 * 60 * 1000),
+        watchMs: 4200,
+        progressPct: 80,
+        completed: false,
+        source: "pour_toi",
       },
     });
   }
@@ -426,6 +447,10 @@ async function main() {
         userId: demo.id,
         videoId: videosAfter[2].id,
         watchedAt: new Date(now - 26 * 60 * 60 * 1000),
+        watchMs: 9000,
+        progressPct: 100,
+        completed: true,
+        source: "abonnements",
       },
     });
   }
@@ -435,9 +460,85 @@ async function main() {
         userId: demo.id,
         videoId: videosAfter[3].id,
         watchedAt: new Date(now - 4 * 24 * 60 * 60 * 1000),
+        watchMs: 3000,
+        progressPct: 40,
+        source: "recherche",
       },
     });
   }
+
+  // Analytics seed: watches ON demo's videos (creator dashboard non-empty)
+  const demoVideos = videosAfter.filter((v) => v.userId === demo.id);
+  const viewerPool = [
+    { user: alice, source: "pour_toi" as const },
+    { user: bob, source: "profil" as const },
+    { user: charlie, source: "recherche" as const },
+    { user: alice, source: "abonnements" as const },
+    { user: bob, source: "pour_toi" as const },
+  ];
+  const sources = ["pour_toi", "profil", "recherche", "abonnements", "autre"] as const;
+  for (const v of demoVideos) {
+    // ensure duration for retention approx
+    await prisma.video.update({
+      where: { id: v.id },
+      data: { durationSec: v.durationSec && v.durationSec > 0 ? v.durationSec : 10 },
+    });
+    for (let day = 0; day < 28; day++) {
+      const perDay = day < 7 ? 3 + (day % 3) : 1 + (day % 2);
+      for (let i = 0; i < perDay; i++) {
+        const viewer = viewerPool[(day + i) % viewerPool.length];
+        const progress = [25, 40, 55, 70, 85, 100][(day + i) % 6];
+        const dur = 10_000;
+        const watchMs = Math.round((progress / 100) * dur);
+        const hoursAgo = day * 24 + (i * 3) + 1;
+        await prisma.watchEvent.create({
+          data: {
+            userId: viewer.user.id,
+            videoId: v.id,
+            watchedAt: new Date(now - hoursAgo * 60 * 60 * 1000),
+            watchMs,
+            progressPct: progress,
+            completed: progress >= 95,
+            source: sources[(day + i) % sources.length],
+          },
+        });
+      }
+      // some anonymous watches
+      if (day % 4 === 0) {
+        await prisma.watchEvent.create({
+          data: {
+            userId: null,
+            videoId: v.id,
+            watchedAt: new Date(now - day * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000),
+            watchMs: 2000,
+            progressPct: 20,
+            completed: false,
+            source: "autre",
+          },
+        });
+      }
+    }
+  }
+
+  // Pourboires reçus (revenus estimés studio)
+  await prisma.transaction.create({
+    data: {
+      userId: demo.id,
+      type: "tip_received",
+      amountCents: 450,
+      meta: JSON.stringify({ demo: true, note: "Pourboire seed analytics", from: "alice" }),
+      createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000),
+    },
+  });
+  await prisma.transaction.create({
+    data: {
+      userId: demo.id,
+      type: "tip_received",
+      amountCents: 100,
+      meta: JSON.stringify({ demo: true, note: "Pourboire seed analytics", from: "bob" }),
+      createdAt: new Date(now - 5 * 60 * 60 * 1000),
+    },
+  });
 
   // Stories (expire in 24h)
   const storyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);

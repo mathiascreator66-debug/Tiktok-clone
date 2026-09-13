@@ -335,15 +335,24 @@ model ProfileLink {
 }
 
 model WatchEvent {
-  id        String   @id @default(cuid())
-  userId    String
-  videoId   String
-  watchedAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  /// Null = spectateur anonyme
+  userId      String?
+  videoId     String
+  watchedAt   DateTime @default(now())
+  /// Durée regardée en ms (meilleure estimation)
+  watchMs     Int?
+  /// True si la vidéo a été vue jusqu’à la fin (ou ≥ 95 %)
+  completed   Boolean  @default(false)
+  /// pour_toi | profil | recherche | abonnements | autre
+  source      String?
+  /// Progression 0–100 si connue
+  progressPct Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@index([userId, watchedAt])
-  @@index([videoId])
+  @@index([videoId, watchedAt])
 }
 
 /// Historique portefeuille (crédits virtuels — démo, pas d'argent réel)

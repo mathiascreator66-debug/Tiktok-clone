@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, MessageCircle, Pin } from "lucide-react";
+import { Heart, MessageCircle, Pin, BarChart3 } from "lucide-react";
 import VideoOwnerMenu from "./VideoOwnerMenu";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -73,6 +73,16 @@ export default function ProfileVideoGrid({
               </div>
             </div>
           </Link>
+          {isOwner && (
+            <Link
+              href={`/studio/videos/${v.id}`}
+              className="absolute bottom-1 left-1 z-10 p-1.5 rounded-full bg-black/60 text-[#25f4ee]"
+              aria-label="Statistiques"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <BarChart3 size={12} />
+            </Link>
+          )}
           {isOwner && (
             <div className="absolute top-1 right-1 z-10">
               <VideoOwnerMenu

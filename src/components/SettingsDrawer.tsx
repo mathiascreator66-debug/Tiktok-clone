@@ -17,6 +17,7 @@ import {
   Sparkles,
   Info,
   HelpCircle,
+  BarChart3,
 } from "lucide-react";
 
 type Props = {
@@ -112,7 +113,13 @@ export default function SettingsDrawer({ open, onClose }: Props) {
           </Section>
           <Section title="Création">
             <LinkItem
-              href="/telecharger"
+              href="/studio"
+              onClick={onClose}
+              icon={<BarChart3 size={20} />}
+              label="Statistiques"
+            />
+            <LinkItem
+              href="/studio"
               onClick={onClose}
               icon={<Clapperboard size={20} />}
               label="AfriVoix Studio"

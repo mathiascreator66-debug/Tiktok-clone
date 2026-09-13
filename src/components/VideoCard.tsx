@@ -28,6 +28,8 @@ import { LinkifiedText } from "@/lib/linkify";
 import { applyMediaGain } from "@/lib/media-edit";
 import VideoMediaOverlays from "./VideoMediaOverlays";
 
+type WatchSource = "pour_toi" | "profil" | "recherche" | "abonnements" | "autre";
+
 type Props = {
   video: FeedVideo;
   isActive: boolean;
@@ -36,6 +38,8 @@ type Props = {
   onInteract: () => void;
   onDeleted?: () => void;
   onHide?: (videoId: string) => void;
+  /** Trafic analytics : pour_toi | profil | recherche | abonnements | autre */
+  watchSource?: WatchSource;
 };
 
 export default function VideoCard({
@@ -45,6 +49,7 @@ export default function VideoCard({
   onInteract,
   onDeleted,
   onHide,
+  watchSource = "pour_toi",
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -77,6 +82,10 @@ export default function VideoCard({
   const muteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const likingRef = useRef(false);
   const watchSentRef = useRef(false);
+  const watchEventIdRef = useRef<string | null>(null);
+  const maxWatchMsRef = useRef(0);
+  const watchSourceRef = useRef(watchSource);
+  watchSourceRef.current = watchSource;
 
   const videoTrimStartSec = (video.videoTrimStartMs || 0) / 1000;
   const videoTrimEndSec =
@@ -191,20 +200,94 @@ export default function VideoCard({
     videoTrimStartSec,
   ]);
 
+  // Analytics: record watch + progress (logged-in upsert / anonymous create)
   useEffect(() => {
-    if (!isActive || !isLoggedIn || watchSentRef.current) return;
-    const t = setTimeout(() => {
-      if (watchSentRef.current) return;
-      watchSentRef.current = true;
-      fetch(`/api/videos/${video.id}/watch`, {
+    if (!isActive) return;
+
+    function sendWatch(payload: {
+      watchMs?: number;
+      completed?: boolean;
+      progressPct?: number;
+    }) {
+      const body: Record<string, unknown> = {
+        source: watchSourceRef.current,
+        ...payload,
+      };
+      if (watchEventIdRef.current) body.eventId = watchEventIdRef.current;
+      return fetch(`/api/videos/${video.id}/watch`, {
         method: "POST",
         credentials: "include",
-      }).catch(() => {
-        watchSentRef.current = false;
-      });
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+        .then(async (res) => {
+          if (!res.ok) return;
+          try {
+            const data = await res.json();
+            if (data.eventId) watchEventIdRef.current = data.eventId;
+          } catch {
+            /* ignore */
+          }
+        })
+        .catch(() => {});
+    }
+
+    const startTimer = setTimeout(() => {
+      if (watchSentRef.current) return;
+      watchSentRef.current = true;
+      const el = videoRef.current;
+      const watchMs = el
+        ? Math.max(
+            maxWatchMsRef.current,
+            Math.round(
+              Math.max(0, el.currentTime - videoTrimStartSec) * 1000
+            )
+          )
+        : maxWatchMsRef.current;
+      maxWatchMsRef.current = watchMs;
+      void sendWatch({ watchMs });
     }, 2000);
-    return () => clearTimeout(t);
-  }, [isActive, isLoggedIn, video.id]);
+
+    const onTime = () => {
+      const el = videoRef.current;
+      if (!el) return;
+      const ms = Math.round(
+        Math.max(0, el.currentTime - videoTrimStartSec) * 1000
+      );
+      if (ms > maxWatchMsRef.current) maxWatchMsRef.current = ms;
+    };
+    const el = videoRef.current;
+    el?.addEventListener("timeupdate", onTime);
+
+    return () => {
+      clearTimeout(startTimer);
+      el?.removeEventListener("timeupdate", onTime);
+      if (watchSentRef.current || maxWatchMsRef.current > 0) {
+        const watchMs = maxWatchMsRef.current;
+        const durMs =
+          videoTrimEndSec != null
+            ? Math.max(0, (videoTrimEndSec - videoTrimStartSec) * 1000)
+            : el?.duration && Number.isFinite(el.duration)
+              ? Math.max(0, (el.duration - videoTrimStartSec) * 1000)
+              : null;
+        const progressPct =
+          durMs && durMs > 0
+            ? Math.min(100, Math.round((watchMs / durMs) * 100))
+            : undefined;
+        const completed = progressPct != null ? progressPct >= 95 : false;
+        void sendWatch({ watchMs, progressPct, completed });
+      }
+    };
+  }, [isActive, video.id, videoTrimStartSec, videoTrimEndSec]);
+
+  // Reset per-video watch session when sliding to another card
+  useEffect(() => {
+    if (!isActive) {
+      watchSentRef.current = false;
+      watchEventIdRef.current = null;
+      maxWatchMsRef.current = 0;
+    }
+  }, [isActive, video.id]);
 
   async function doLike(forceLike = false) {
     if (!isLoggedIn) {

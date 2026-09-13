@@ -15,6 +15,7 @@ import {
   Info,
   HelpCircle,
   FileText,
+  BarChart3,
 } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { getSession } from "@/lib/auth";
@@ -50,7 +51,12 @@ export default async function ParametresPage() {
           label="Historique de visionnage"
         />
         <LinkItem
-          href="/telecharger"
+          href="/studio"
+          icon={<BarChart3 size={20} />}
+          label="Statistiques"
+        />
+        <LinkItem
+          href="/studio"
           icon={<Clapperboard size={20} />}
           label="AfriVoix Studio"
         />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MoreVertical, Pencil, Pin, PinOff, Trash2, Rocket } from "lucide-react";
+import { MoreVertical, Pencil, Pin, PinOff, Trash2, Rocket, BarChart3 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type Props = {
@@ -177,6 +177,16 @@ export default function VideoOwnerMenu({
         >
           {!editing ? (
             <>
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/10 text-left"
+                onClick={() => {
+                  setOpen(false);
+                  router.push(`/studio/videos/${videoId}`);
+                }}
+              >
+                <BarChart3 size={16} className="text-[#25f4ee]" /> Statistiques
+              </button>
               <button
                 type="button"
                 className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/10 text-left"

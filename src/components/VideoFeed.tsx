@@ -251,6 +251,7 @@ export default function VideoFeed({
                 isActive={i === activeIndex}
                 isLoggedIn={isLoggedIn}
                 hasInteracted={hasInteracted}
+                watchSource={tab === "following" ? "abonnements" : "pour_toi"}
                 onInteract={onInteract}
                 onDeleted={() => {
                   const removeId = (prev: FeedVideo[]) =>
