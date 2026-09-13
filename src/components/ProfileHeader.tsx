@@ -344,6 +344,7 @@ export default function ProfileHeader({
           groups={[storyGroup]}
           startGroupIndex={0}
           isLoggedIn={isLoggedIn}
+          currentUsername={isMe ? username : null}
           onClose={() => setViewerOpen(false)}
           onViewed={(storyId) => {
             setStoryGroup((prev) => {

@@ -43,6 +43,8 @@ export async function GET(
         id: s.id,
         mediaUrl: s.mediaUrl,
         caption: s.caption,
+        soundName: s.soundName,
+        soundUrl: s.soundUrl,
         createdAt: s.createdAt.toISOString(),
         expiresAt: s.expiresAt.toISOString(),
         viewedByMe:

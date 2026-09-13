@@ -42,3 +42,25 @@ export function formatDurationLabel(sec: number): string {
   const s = Math.floor(sec % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+/** Gallery audio attach (mp3/m4a/aac/wav/ogg) — 20 Mo */
+export const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+export const MAX_AUDIO_LABEL = "20 Mo";
+export const AUDIO_ACCEPT =
+  "audio/mpeg,audio/mp3,audio/mp4,audio/aac,audio/wav,audio/wave,audio/x-wav,audio/ogg,audio/webm,.mp3,.m4a,.aac,.wav,.ogg";
+export const ALLOWED_AUDIO_MIME = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/mp4",
+  "audio/aac",
+  "audio/wav",
+  "audio/wave",
+  "audio/x-wav",
+  "audio/ogg",
+  "audio/webm",
+  "audio/x-m4a",
+]);
+export const ALLOWED_AUDIO_EXT = [".mp3", ".m4a", ".aac", ".wav", ".ogg", ".webm"];
+
+export const STORY_QUICK_EMOJIS = ["❤️", "😂", "🔥", "👏", "😮", "😢", "😍", "💯"] as const;
+export const STORY_COMMENT_MAX = 200;

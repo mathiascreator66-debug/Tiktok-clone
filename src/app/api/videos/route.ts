@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, unlink } from "fs/promises";
+import { unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getFollowingFeed, getMixedFeed } from "@/lib/feed";
-import { ensureUploadDir } from "@/lib/uploads";
+import {
+  ensureUploadDir,
+  saveUploadFile,
+  isAllowedAudioFile,
+  audioExtFor,
+} from "@/lib/uploads";
 import {
   CAPTION_MAX_LENGTH,
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_LABEL,
   MAX_VIDEO_DURATION_SEC,
+  MAX_AUDIO_BYTES,
+  MAX_AUDIO_LABEL,
 } from "@/lib/limits";
 import { originalSoundName, soundLabel } from "@/lib/sounds";
 import { syncVideoHashtags } from "@/lib/hashtags";
-import { parseClientDuration, probeDurationSeconds } from "@/lib/duration";
+import { parseClientDuration, resolveDurationSeconds } from "@/lib/duration";
 import { safeError } from "@/lib/safe-log";
 
 export async function GET(req: NextRequest) {
@@ -53,6 +60,7 @@ export async function POST(req: NextRequest) {
     const file = form.get("video") as File | null;
     const soundRaw = String(form.get("soundName") || "").trim();
     const clientDuration = parseClientDuration(form.get("durationSec"));
+    const audioFile = form.get("audio") as File | null;
 
     if (!caption) {
       return NextResponse.json({ error: "Légende requise." }, { status: 400 });
@@ -88,16 +96,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (audioFile && audioFile.size > 0) {
+      if (!isAllowedAudioFile(audioFile)) {
+        return NextResponse.json(
+          { error: "Format audio non supporté (mp3, m4a, aac, wav, ogg)." },
+          { status: 400 }
+        );
+      }
+      if (audioFile.size > MAX_AUDIO_BYTES) {
+        return NextResponse.json(
+          { error: `Audio trop lourd (max ${MAX_AUDIO_LABEL}).` },
+          { status: 400 }
+        );
+      }
+    }
+
     const ext = path.extname(file.name) || ".mp4";
     const filename = `${randomUUID()}${ext}`;
     const uploadsDir = await ensureUploadDir();
     const fullPath = path.join(uploadsDir, filename);
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(fullPath, buffer);
+    // Store as-is — no server re-encode for fast publish
+    await saveUploadFile(file, fullPath);
 
-    let durationSec = clientDuration;
-    const probed = await probeDurationSeconds(fullPath);
-    if (probed != null) durationSec = probed;
+    // Prefer client HTML5 duration; skip slow ffprobe when available
+    const durationSec = await resolveDurationSeconds(fullPath, clientDuration);
 
     if (durationSec != null && durationSec > MAX_VIDEO_DURATION_SEC + 1) {
       await unlink(fullPath).catch(() => {});
@@ -109,13 +131,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const soundName = soundLabel(soundRaw, session.username);
+    let soundUrl: string | null = null;
+    let soundName = soundLabel(soundRaw, session.username);
+
+    if (audioFile && audioFile.size > 0) {
+      const aExt = audioExtFor(audioFile);
+      const aName = `${randomUUID()}${aExt}`;
+      const audioDir = await ensureUploadDir("audio");
+      await saveUploadFile(audioFile, path.join(audioDir, aName));
+      soundUrl = `/uploads/audio/${aName}`;
+      const base =
+        audioFile.name.replace(/\.[^.]+$/, "").trim().slice(0, 60) ||
+        "Musique galerie";
+      soundName = soundRaw || base;
+    }
 
     const video = await prisma.video.create({
       data: {
         caption,
         videoUrl: `/uploads/${filename}`,
         soundName: soundName || originalSoundName(session.username),
+        soundUrl,
         userId: session.id,
         durationSec: durationSec ?? null,
       },
@@ -140,6 +176,7 @@ export async function POST(req: NextRequest) {
         caption: video.caption,
         videoUrl: video.videoUrl,
         soundName: video.soundName,
+        soundUrl: video.soundUrl,
         createdAt: video.createdAt.toISOString(),
         likeCount: 0,
         commentCount: 0,

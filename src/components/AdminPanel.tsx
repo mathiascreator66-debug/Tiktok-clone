@@ -7,7 +7,7 @@ import BrandLogo from "./BrandLogo";
 
 type UserRow = {
   id: string;
-  email: string;
+  email: string | null;
   username: string;
   displayName: string | null;
   accountStatus: string;
@@ -41,7 +41,7 @@ type ActionRow = {
 type TicketRow = {
   id: string;
   createdAt: string;
-  email: string;
+  email: string | null;
   subject: string;
   message: string;
 };

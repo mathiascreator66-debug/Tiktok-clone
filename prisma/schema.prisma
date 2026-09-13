@@ -9,7 +9,8 @@ datasource db {
 
 model User {
   id            String          @id @default(cuid())
-  email         String          @unique
+  /// Optional when phoneE164 is set (email OR phone registration).
+  email         String?         @unique
   username      String          @unique
   passwordHash  String?
   displayName   String?
@@ -31,7 +32,8 @@ model User {
   /// fr | en | zh
   language      String          @default("fr")
   birthdate     DateTime?
-  phoneE164     String?
+  /// Optional when email is set; E.164; SQLite UNIQUE allows multiple NULLs
+  phoneE164     String?         @unique
   phoneCountry  String?
   createdAt     DateTime        @default(now())
   videos        Video[]
@@ -46,6 +48,8 @@ model User {
   messages      Message[]
   stories       Story[]
   storyViews    StoryView[]
+  storyComments StoryComment[]
+  storyReactions StoryReaction[]
   bookmarks     Bookmark[]
   notInterested NotInterested[]
   reports       Report[]        @relation("Reporter")
@@ -62,6 +66,8 @@ model Video {
   caption       String
   videoUrl      String
   soundName     String?
+  /// Gallery-uploaded audio URL; when set, playback mutes original video audio
+  soundUrl      String?
   durationSec   Float?
   pinnedAt      DateTime?
   /// Boost actif jusqu'à cette date (visibilité feed Pour toi)
@@ -192,15 +198,20 @@ model Message {
 }
 
 model Story {
-  id          String      @id @default(cuid())
+  id          String          @id @default(cuid())
   userId      String
   mediaUrl    String
   caption     String?
+  soundName   String?
+  /// Gallery-uploaded audio; when set, mute original video audio on playback
+  soundUrl    String?
   durationSec Float?
-  createdAt   DateTime    @default(now())
+  createdAt   DateTime        @default(now())
   expiresAt   DateTime
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   views       StoryView[]
+  comments    StoryComment[]
+  reactions   StoryReaction[]
 
   @@index([expiresAt])
   @@index([userId, expiresAt])
@@ -215,6 +226,32 @@ model StoryView {
   story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
 
   @@unique([userId, storyId])
+  @@index([storyId])
+}
+
+model StoryComment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  content   String
+  userId    String
+  storyId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([storyId, createdAt])
+  @@index([userId])
+}
+
+model StoryReaction {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  emoji     String
+  userId    String
+  storyId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storyId, emoji])
   @@index([storyId])
 }
 

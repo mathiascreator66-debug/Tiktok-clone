@@ -45,6 +45,7 @@ export default function VideoCard({
   onHide,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [liked, setLiked] = useState(video.likedByMe);
   const [likeCount, setLikeCount] = useState(video.likeCount);
   const [commentCount, setCommentCount] = useState(video.commentCount);
@@ -85,9 +86,24 @@ export default function VideoCard({
 
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.muted = muted || !hasInteracted;
+      // Gallery music: always mute original video track (documented behavior)
+      const forceMute = Boolean(video.soundUrl) || muted || !hasInteracted;
+      videoRef.current.muted = forceMute;
     }
-  }, [muted, hasInteracted]);
+  }, [muted, hasInteracted, video.soundUrl]);
+
+  // Play attached gallery audio with the video; pause when inactive
+  useEffect(() => {
+    const audio = audioRef.current;
+    const vid = videoRef.current;
+    if (!audio || !video.soundUrl) return;
+    if (isActive && !commentsOpen && !shareOpen && !tipOpen && hasInteracted && !muted) {
+      if (vid) audio.currentTime = vid.currentTime;
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  }, [isActive, commentsOpen, shareOpen, tipOpen, hasInteracted, muted, video.soundUrl]);
 
   useEffect(() => {
     if (!isActive || !isLoggedIn || watchSentRef.current) return;
@@ -322,10 +338,20 @@ export default function VideoCard({
         className="absolute inset-0 w-full h-full object-cover"
         loop
         playsInline
-        muted={muted || !hasInteracted}
+        muted={Boolean(video.soundUrl) || muted || !hasInteracted}
         onClick={handleTap}
         preload="metadata"
+        onTimeUpdate={() => {
+          const a = audioRef.current;
+          const v = videoRef.current;
+          if (a && v && video.soundUrl && Math.abs(a.currentTime - v.currentTime) > 0.35) {
+            a.currentTime = v.currentTime;
+          }
+        }}
       />
+      {video.soundUrl ? (
+        <audio ref={audioRef} src={video.soundUrl} loop preload="auto" />
+      ) : null}
 
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/20" />
 

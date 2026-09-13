@@ -39,3 +39,12 @@ export function clientIp(req: { headers: Headers }): string {
 export function authRateLimit(req: { headers: Headers }, route: string) {
   return rateLimit(`auth:${route}:${clientIp(req)}`, 10, 60_000);
 }
+
+/** Light limit for story comments / reactions */
+export function storyInteractRateLimit(
+  req: { headers: Headers },
+  userId: string,
+  kind: "comment" | "reaction"
+) {
+  return rateLimit(`story:${kind}:${userId}:${clientIp(req)}`, 30, 60_000);
+}

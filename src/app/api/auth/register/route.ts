@@ -5,6 +5,7 @@ import { authRateLimit } from "@/lib/rate-limit";
 import { safeError } from "@/lib/safe-log";
 import { MIN_AGE } from "@/lib/limits";
 import { COUNTRIES } from "@/lib/countries";
+import { normalizePhoneE164, looksLikeEmail } from "@/lib/phone";
 
 const LANGS = new Set(["fr", "en", "zh"]);
 const COUNTRY_CODES = new Set(COUNTRIES.map((c) => c.code));
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const email = String(body.email || "").trim().toLowerCase();
+    const emailRaw = String(body.email || "").trim().toLowerCase();
     const username = String(body.username || "")
       .trim()
       .toLowerCase()
@@ -33,15 +34,18 @@ export async function POST(req: NextRequest) {
     const phoneCountry = body.phoneCountry
       ? String(body.phoneCountry).trim().slice(0, 8)
       : null;
-    const phoneE164 = body.phoneE164
-      ? String(body.phoneE164).replace(/[^\d+]/g, "").slice(0, 20)
+    const phoneFromBody = body.phoneE164
+      ? normalizePhoneE164(String(body.phoneE164))
       : null;
 
-    if (!email || !username || password.length < 6) {
+    const email = emailRaw && looksLikeEmail(emailRaw) ? emailRaw : null;
+    const phoneE164 = phoneFromBody;
+
+    if (!username || password.length < 6) {
       return NextResponse.json(
         {
           error:
-            "Email, nom d'utilisateur et mot de passe (6+ caractères) requis.",
+            "Nom d'utilisateur et mot de passe (6+ caractères) requis.",
         },
         { status: 400 }
       );
@@ -52,6 +56,20 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Exactly one of email or phone
+    const hasEmail = Boolean(email);
+    const hasPhone = Boolean(phoneE164);
+    if (hasEmail === hasPhone) {
+      return NextResponse.json(
+        {
+          error:
+            "Choisissez soit un e-mail, soit un téléphone (pas les deux, pas aucun).",
+        },
+        { status: 400 }
+      );
+    }
+
     if (!acceptCgu) {
       return NextResponse.json(
         { error: "Vous devez accepter les CGU pour vous inscrire." },
@@ -87,12 +105,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const orChecks: { email?: string; username?: string; phoneE164?: string }[] =
+      [{ username }];
+    if (email) orChecks.push({ email });
+    if (phoneE164) orChecks.push({ phoneE164 });
+
     const existing = await prisma.user.findFirst({
-      where: { OR: [{ email }, { username }] },
+      where: { OR: orChecks },
     });
     if (existing) {
+      if (existing.username === username) {
+        return NextResponse.json(
+          { error: "Ce nom d'utilisateur est déjà pris." },
+          { status: 409 }
+        );
+      }
+      if (email && existing.email === email) {
+        return NextResponse.json(
+          { error: "Cet e-mail est déjà utilisé." },
+          { status: 409 }
+        );
+      }
+      if (phoneE164 && existing.phoneE164 === phoneE164) {
+        return NextResponse.json(
+          { error: "Ce numéro de téléphone est déjà utilisé." },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
-        { error: "Cet email ou nom d'utilisateur est déjà utilisé." },
+        { error: "Identifiant déjà utilisé." },
         { status: 409 }
       );
     }
@@ -107,7 +148,7 @@ export async function POST(req: NextRequest) {
         language,
         birthdate,
         phoneE164: phoneE164 || null,
-        phoneCountry: phoneCountry || null,
+        phoneCountry: phoneE164 ? phoneCountry || null : null,
         accountStatus: "ACTIVE",
       },
     });
@@ -125,6 +166,7 @@ export async function POST(req: NextRequest) {
         email: user.email,
         username: user.username,
         avatarUrl: user.avatarUrl,
+        phoneE164: user.phoneE164,
       },
     });
   } catch (e) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession, getSession } from "@/lib/auth";
 import { BIO_MAX_LENGTH, MAX_PROFILE_LINKS } from "@/lib/limits";
+import { normalizePhoneE164 } from "@/lib/phone";
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -16,6 +17,8 @@ export async function PATCH(req: NextRequest) {
       displayName?: string | null;
       username?: string;
       avatarUrl?: string | null;
+      phoneE164?: string | null;
+      phoneCountry?: string | null;
     } = {};
 
     if ("bio" in body) {
@@ -89,6 +92,35 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+
+    if ("phoneE164" in body) {
+      const raw = body.phoneE164 == null ? "" : String(body.phoneE164).trim();
+      if (!raw) {
+        data.phoneE164 = null;
+        data.phoneCountry = null;
+      } else {
+        const phone = normalizePhoneE164(raw);
+        if (!phone) {
+          return NextResponse.json(
+            { error: "Numéro de téléphone invalide." },
+            { status: 400 }
+          );
+        }
+        const taken = await prisma.user.findFirst({
+          where: { phoneE164: phone, NOT: { id: session.id } },
+        });
+        if (taken) {
+          return NextResponse.json(
+            { error: "Ce numéro est déjà utilisé." },
+            { status: 409 }
+          );
+        }
+        data.phoneE164 = phone;
+        if (body.phoneCountry) {
+          data.phoneCountry = String(body.phoneCountry).trim().slice(0, 8);
+        }
+      }
+    }
     let linksPayload: { url: string; label: string | null }[] | null = null;
     if ("links" in body) {
       if (!Array.isArray(body.links)) {
@@ -144,6 +176,7 @@ export async function PATCH(req: NextRequest) {
       displayName: true,
       avatarUrl: true,
       bio: true,
+      phoneE164: true,
       createdAt: true,
     } as const;
 

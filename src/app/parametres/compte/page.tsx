@@ -15,6 +15,7 @@ export default async function ComptePage() {
       username: true,
       displayName: true,
       passwordHash: true,
+      phoneE164: true,
     },
   });
   if (!user) redirect("/connexion");
@@ -25,6 +26,7 @@ export default async function ComptePage() {
         username: user.username,
         displayName: user.displayName,
         hasPassword: Boolean(user.passwordHash),
+        phoneE164: user.phoneE164,
       }}
     />
   );

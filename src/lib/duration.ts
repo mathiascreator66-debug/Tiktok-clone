@@ -9,7 +9,8 @@ export const MAX_STORY_DURATION_SEC = 3 * 60;
 
 /**
  * Probe duration with ffprobe if available.
- * Returns seconds or null if unavailable.
+ * Prefer client-reported HTML5 duration to avoid blocking uploads.
+ * Timeout kept short (3s) so a missing/slow ffprobe never freezes publish.
  */
 export async function probeDurationSeconds(
   filePath: string
@@ -26,13 +27,30 @@ export async function probeDurationSeconds(
         "default=noprint_wrappers=1:nokey=1",
         filePath,
       ],
-      { timeout: 15000 }
+      { timeout: 3000 }
     );
     const n = parseFloat(String(stdout).trim());
     return Number.isFinite(n) && n > 0 ? n : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Use client duration when present (validated HTML5 metadata).
+ * Only fall back to ffprobe when client did not send a duration.
+ * Avoids double-work and keeps publish snappy.
+ */
+export async function resolveDurationSeconds(
+  filePath: string,
+  clientDuration: number | null,
+  opts?: { forceProbe?: boolean }
+): Promise<number | null> {
+  if (clientDuration != null && !opts?.forceProbe) {
+    return clientDuration;
+  }
+  const probed = await probeDurationSeconds(filePath);
+  return probed ?? clientDuration;
 }
 
 export function parseClientDuration(raw: unknown): number | null {

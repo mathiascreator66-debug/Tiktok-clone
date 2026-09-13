@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { createSession, verifyPassword } from "@/lib/auth";
 import { authRateLimit } from "@/lib/rate-limit";
 import { safeError } from "@/lib/safe-log";
+import {
+  looksLikeEmail,
+  looksLikePhone,
+  normalizePhoneE164,
+} from "@/lib/phone";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,17 +20,41 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const email = String(body.email || "").trim().toLowerCase();
+    const identifier = String(
+      body.identifier || body.email || body.phoneE164 || ""
+    ).trim();
     const password = String(body.password || "");
 
-    if (!email || !password) {
+    if (!identifier || !password) {
       return NextResponse.json(
-        { error: "Email et mot de passe requis." },
+        { error: "Identifiant (e-mail ou téléphone) et mot de passe requis." },
         { status: 400 }
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    let user = null;
+    if (looksLikeEmail(identifier)) {
+      user = await prisma.user.findUnique({
+        where: { email: identifier.toLowerCase() },
+      });
+    } else if (looksLikePhone(identifier)) {
+      const phone = normalizePhoneE164(identifier);
+      if (phone) {
+        user = await prisma.user.findUnique({ where: { phoneE164: phone } });
+      }
+    } else {
+      // try email then phone
+      user = await prisma.user.findUnique({
+        where: { email: identifier.toLowerCase() },
+      });
+      if (!user) {
+        const phone = normalizePhoneE164(identifier);
+        if (phone) {
+          user = await prisma.user.findUnique({ where: { phoneE164: phone } });
+        }
+      }
+    }
+
     if (!user || !user.passwordHash) {
       return NextResponse.json(
         {
@@ -78,6 +107,7 @@ export async function POST(req: NextRequest) {
         avatarUrl: user.avatarUrl,
         displayName: user.displayName,
         bio: user.bio,
+        phoneE164: user.phoneE164,
       },
     });
   } catch (e) {

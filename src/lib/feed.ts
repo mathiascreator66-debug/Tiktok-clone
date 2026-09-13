@@ -7,6 +7,7 @@ type VideoWithRelations = {
   caption: string;
   videoUrl: string;
   soundName: string | null;
+  soundUrl: string | null;
   pinnedAt: Date | null;
   boostedUntil: Date | null;
   createdAt: Date;
@@ -37,6 +38,7 @@ function mapVideo(
     caption: v.caption,
     videoUrl: v.videoUrl,
     soundName: v.soundName,
+    soundUrl: v.soundUrl ?? null,
     createdAt: v.createdAt.toISOString(),
     likeCount: v._count.likes,
     commentCount: v._count.comments,

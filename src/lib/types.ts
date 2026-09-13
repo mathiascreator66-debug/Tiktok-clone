@@ -3,6 +3,8 @@ export type FeedVideo = {
   caption: string;
   videoUrl: string;
   soundName: string | null;
+  /** Gallery music URL — when set, mute original video audio and play this */
+  soundUrl: string | null;
   createdAt: string;
   likeCount: number;
   commentCount: number;
@@ -56,6 +58,8 @@ export type StoryItem = {
   id: string;
   mediaUrl: string;
   caption: string | null;
+  soundName: string | null;
+  soundUrl: string | null;
   createdAt: string;
   expiresAt: string;
   viewedByMe: boolean;
@@ -76,4 +80,17 @@ export type ProfileLinkItem = {
   id?: string;
   url: string;
   label: string | null;
+};
+
+export type StoryCommentItem = {
+  id: string;
+  content: string;
+  createdAt: string;
+  user: CommentUser;
+};
+
+export type StoryReactionSummary = {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
 };

@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { SendHorizontal, X } from "lucide-react";
 import Avatar from "./Avatar";
 import type { StoryGroup } from "@/lib/types";
+import { STORY_COMMENT_MAX, STORY_QUICK_EMOJIS } from "@/lib/limits";
+import { LinkifiedText } from "@/lib/linkify";
 import Link from "next/link";
 
 type Props = {
   groups: StoryGroup[];
   startGroupIndex: number;
   isLoggedIn: boolean;
+  currentUsername?: string | null;
   onClose: () => void;
   onViewed: (storyId: string, userId: string) => void;
 };
@@ -25,6 +28,7 @@ export default function StoryViewer({
   groups,
   startGroupIndex,
   isLoggedIn,
+  currentUsername,
   onClose,
   onViewed,
 }: Props) {
@@ -32,17 +36,29 @@ export default function StoryViewer({
   const [groupIndex, setGroupIndex] = useState(startGroupIndex);
   const [storyIndex, setStoryIndex] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [comment, setComment] = useState("");
+  const [sending, setSending] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [myReactions, setMyReactions] = useState<Set<string>>(new Set());
+  const [recentComments, setRecentComments] = useState<
+    { id: string; content: string; user: string }[]
+  >([]);
   const rafRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const startTs = useRef(0);
   const progressRef = useRef(0);
   const pausedRef = useRef(false);
   const pauseAtRef = useRef(0);
+  const inputFocused = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
   const group = groups[groupIndex];
   const story = group?.stories[storyIndex];
+  const isOwn = Boolean(
+    currentUsername && group && group.user.username === currentUsername
+  );
 
   const markViewed = useCallback(
     (sId: string, uId: string) => {
@@ -59,6 +75,7 @@ export default function StoryViewer({
   );
 
   const goNext = useCallback(() => {
+    if (inputFocused.current) return;
     const g = groups[groupIndex];
     if (!g) return;
     if (storyIndex < g.stories.length - 1) {
@@ -101,6 +118,57 @@ export default function StoryViewer({
     markViewed(story.id, group.user.id);
   }, [story?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load reactions / owner comments for current story
+  useEffect(() => {
+    if (!story) return;
+    setMyReactions(new Set());
+    setRecentComments([]);
+    setComment("");
+    let cancelled = false;
+    (async () => {
+      try {
+        const [rRes, cRes] = await Promise.all([
+          fetch(`/api/story/${story.id}/reactions`, { credentials: "include" }),
+          isOwn
+            ? fetch(`/api/story/${story.id}/comments`, {
+                credentials: "include",
+              })
+            : Promise.resolve(null),
+        ]);
+        if (cancelled) return;
+        if (rRes.ok) {
+          const data = await rRes.json();
+          const mine = new Set<string>();
+          for (const r of data.reactions || []) {
+            if (r.reactedByMe) mine.add(r.emoji);
+          }
+          setMyReactions(mine);
+        }
+        if (cRes && cRes.ok) {
+          const data = await cRes.json();
+          setRecentComments(
+            (data.comments || []).slice(0, 8).map(
+              (c: {
+                id: string;
+                content: string;
+                user: { username: string };
+              }) => ({
+                id: c.id,
+                content: c.content,
+                user: c.user.username,
+              })
+            )
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [story?.id, isOwn, story]); // story used for id; keep id primary
+
   useEffect(() => {
     if (!story) return;
 
@@ -110,10 +178,25 @@ export default function StoryViewer({
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
     const video = isVideo(story.mediaUrl);
+    const hasGalleryMusic = Boolean(story.soundUrl);
     setProgress(0);
     progressRef.current = 0;
     startTs.current = performance.now();
     pausedRef.current = false;
+
+    // Gallery music: mute original video audio, play attached track
+    const audioEl = audioRef.current;
+    if (audioEl) {
+      audioEl.pause();
+      if (hasGalleryMusic && story.soundUrl) {
+        audioEl.src = story.soundUrl;
+        audioEl.currentTime = 0;
+        audioEl.play().catch(() => {});
+      } else {
+        audioEl.removeAttribute("src");
+        audioEl.load();
+      }
+    }
 
     if (video) {
       const tick = () => {
@@ -132,6 +215,7 @@ export default function StoryViewer({
       const el = videoRef.current;
       if (el) {
         el.currentTime = 0;
+        el.muted = hasGalleryMusic; // mute original when gallery music attached
         el.play().catch(() => {});
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -153,30 +237,97 @@ export default function StoryViewer({
       rafRef.current = requestAnimationFrame(tick);
     }
 
+    const audioElCleanup = audioEl;
     return () => {
       document.body.style.overflow = prevOverflow;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      audioElCleanup?.pause();
     };
   }, [story?.id, groupIndex, storyIndex, goNext, story]);
 
   function pause() {
+    if (inputFocused.current) return;
     pausedRef.current = true;
     pauseAtRef.current = progressRef.current;
     videoRef.current?.pause();
+    audioRef.current?.pause();
   }
 
   function resume() {
+    if (inputFocused.current) return;
     if (!pausedRef.current) return;
     pausedRef.current = false;
     if (story && !isVideo(story.mediaUrl)) {
       startTs.current = performance.now() - pauseAtRef.current * IMAGE_MS;
     }
     videoRef.current?.play().catch(() => {});
+    if (story?.soundUrl) audioRef.current?.play().catch(() => {});
+  }
+
+  function showFlash(msg: string) {
+    setFlash(msg);
+    setTimeout(() => setFlash(null), 1600);
+  }
+
+  async function sendComment(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!story || !isLoggedIn || isOwn) return;
+    const content = comment.trim().slice(0, STORY_COMMENT_MAX);
+    if (!content) return;
+    setSending(true);
+    try {
+      const res = await fetch(`/api/story/${story.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showFlash(data.error || "Erreur");
+        return;
+      }
+      setComment("");
+      showFlash("Réponse envoyée");
+    } catch {
+      showFlash("Erreur réseau");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function react(emoji: string) {
+    if (!story || !isLoggedIn) {
+      showFlash("Connectez-vous pour réagir");
+      return;
+    }
+    // optimistic
+    setMyReactions((prev) => {
+      const next = new Set(prev);
+      if (next.has(emoji)) next.delete(emoji);
+      else next.add(emoji);
+      return next;
+    });
+    try {
+      const res = await fetch(`/api/story/${story.id}/reactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ emoji }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showFlash(data.error || "Erreur");
+      }
+    } catch {
+      showFlash("Erreur réseau");
+    }
   }
 
   if (!mounted || !group || !story) return null;
 
   const video = isVideo(story.mediaUrl);
+  const hasGalleryMusic = Boolean(story.soundUrl);
 
   const ui = (
     <div
@@ -186,6 +337,8 @@ export default function StoryViewer({
       aria-modal="true"
       aria-label="Stories"
     >
+      <audio ref={audioRef} playsInline preload="auto" />
+
       <div className="absolute top-0 inset-x-0 z-20 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex gap-1">
         {group.stories.map((s, i) => (
           <div
@@ -241,6 +394,7 @@ export default function StoryViewer({
             className="absolute inset-0 w-full h-full object-contain bg-black"
             playsInline
             autoPlay
+            muted={hasGalleryMusic}
           />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
@@ -279,9 +433,92 @@ export default function StoryViewer({
       </div>
 
       {story.caption && (
-        <p className="absolute bottom-10 inset-x-0 z-20 px-4 text-center text-sm text-white drop-shadow pb-[env(safe-area-inset-bottom)]">
-          {story.caption}
+        <p className="absolute bottom-36 inset-x-0 z-20 px-4 text-center text-sm text-white drop-shadow">
+          <LinkifiedText text={story.caption} />
         </p>
+      )}
+
+      {story.soundName && (
+        <p className="absolute bottom-28 inset-x-0 z-20 px-4 text-center text-[11px] text-white/70">
+          ♪ {story.soundName}
+        </p>
+      )}
+
+      {/* Owner: incoming replies */}
+      {isOwn && recentComments.length > 0 && (
+        <div className="absolute bottom-24 inset-x-0 z-30 px-3 max-h-28 overflow-y-auto space-y-1 pointer-events-none">
+          {recentComments.map((c) => (
+            <p
+              key={c.id}
+              className="text-xs bg-black/50 rounded-lg px-2 py-1 text-white/90"
+            >
+              <span className="font-semibold">@{c.user}</span> {c.content}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Viewer: emoji row + comment input */}
+      {!isOwn && (
+        <div className="absolute bottom-0 inset-x-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))] px-3 pt-2 bg-gradient-to-t from-black/80 to-transparent">
+          <div className="flex gap-1.5 mb-2 overflow-x-auto scrollbar-hide justify-center">
+            {STORY_QUICK_EMOJIS.map((em) => (
+              <button
+                key={em}
+                type="button"
+                onClick={() => react(em)}
+                className={`text-xl w-10 h-10 rounded-full flex items-center justify-center transition ${
+                  myReactions.has(em)
+                    ? "bg-white/30 scale-110"
+                    : "bg-white/10 hover:bg-white/20"
+                }`}
+                aria-label={`Réagir ${em}`}
+              >
+                {em}
+              </button>
+            ))}
+          </div>
+          {isLoggedIn ? (
+            <form onSubmit={sendComment} className="flex gap-2 items-center">
+              <input
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                maxLength={STORY_COMMENT_MAX}
+                placeholder="Répondre à la story…"
+                className="flex-1 bg-white/15 rounded-full px-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-white/40"
+                onFocus={() => {
+                  inputFocused.current = true;
+                  pause();
+                }}
+                onBlur={() => {
+                  inputFocused.current = false;
+                  resume();
+                }}
+              />
+              <button
+                type="submit"
+                disabled={sending || !comment.trim()}
+                className="p-2.5 rounded-full bg-[#fe2c55] disabled:opacity-40"
+                aria-label="Envoyer"
+              >
+                <SendHorizontal size={18} />
+              </button>
+            </form>
+          ) : (
+            <p className="text-center text-xs text-white/50 py-2">
+              <Link href="/connexion" className="text-[#25f4ee] underline">
+                Connectez-vous
+              </Link>{" "}
+              pour commenter ou réagir
+            </p>
+          )}
+        </div>
+      )}
+
+      {flash && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 bg-black/70 rounded-xl px-4 py-2 text-sm">
+          {flash}
+        </div>
       )}
     </div>
   );

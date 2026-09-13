@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Heart, MessageCircle, UserPlus } from "lucide-react";
+import { Bookmark, Heart, MessageCircle, UserPlus, Sparkles } from "lucide-react";
 import Avatar from "./Avatar";
 import { formatRelativeFr } from "@/lib/time";
 
-type Kind = "like" | "comment" | "follow" | "save";
+type Kind = "like" | "comment" | "follow" | "save" | "story_comment" | "story_reaction";
 type Filter = "all" | "comment" | "like";
 
 type Item = {
@@ -23,12 +23,18 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "like", label: "J'aime" },
 ];
 
+function matchesFilter(kind: Kind, filter: Filter) {
+  if (filter === "all") return true;
+  if (filter === "comment") return kind === "comment" || kind === "story_comment";
+  if (filter === "like") return kind === "like" || kind === "story_reaction";
+  return true;
+}
+
 export default function ActivityCenter({ items }: { items: Item[] }) {
   const [filter, setFilter] = useState<Filter>("all");
 
   const visible = useMemo(() => {
-    if (filter === "all") return items;
-    return items.filter((i) => i.kind === filter);
+    return items.filter((i) => matchesFilter(i.kind, filter));
   }, [items, filter]);
 
   return (
@@ -53,7 +59,7 @@ export default function ActivityCenter({ items }: { items: Item[] }) {
       {visible.length === 0 ? (
         <p className="text-white/45 text-sm text-center py-16 px-4">
           {filter === "all"
-            ? "Aucune activité récente sur vos vidéos (30 derniers jours)."
+            ? "Aucune activité récente (30 derniers jours)."
             : "Rien dans ce filtre pour le moment."}
         </p>
       ) : (
@@ -72,23 +78,25 @@ export default function ActivityCenter({ items }: { items: Item[] }) {
                   />
                   <span
                     className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center ${
-                      item.kind === "like"
+                      item.kind === "like" || item.kind === "story_reaction"
                         ? "bg-[#fe2c55]"
-                        : item.kind === "comment"
+                        : item.kind === "comment" || item.kind === "story_comment"
                           ? "bg-sky-500"
                           : item.kind === "save"
                             ? "bg-yellow-500"
                             : "bg-emerald-500"
                     }`}
                   >
-                    {item.kind === "like" ? (
+                    {item.kind === "like" || item.kind === "story_reaction" ? (
                       <Heart size={11} fill="white" className="text-white" />
-                    ) : item.kind === "comment" ? (
+                    ) : item.kind === "comment" || item.kind === "story_comment" ? (
                       <MessageCircle size={11} className="text-white" />
                     ) : item.kind === "save" ? (
                       <Bookmark size={11} className="text-white" fill="white" />
-                    ) : (
+                    ) : item.kind === "follow" ? (
                       <UserPlus size={11} className="text-white" />
+                    ) : (
+                      <Sparkles size={11} className="text-white" />
                     )}
                   </span>
                 </div>

@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
+import { unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { ensureUploadDir } from "@/lib/uploads";
-import { MAX_UPLOAD_BYTES, MAX_UPLOAD_LABEL, MAX_STORY_DURATION_SEC } from "@/lib/limits";
-import { parseClientDuration, probeDurationSeconds } from "@/lib/duration";
+import {
+  ensureUploadDir,
+  saveUploadFile,
+  isAllowedAudioFile,
+  audioExtFor,
+} from "@/lib/uploads";
+import {
+  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_LABEL,
+  MAX_STORY_DURATION_SEC,
+  MAX_AUDIO_BYTES,
+  MAX_AUDIO_LABEL,
+} from "@/lib/limits";
+import { parseClientDuration, resolveDurationSeconds } from "@/lib/duration";
 import { safeError } from "@/lib/safe-log";
 
 const MAX_BYTES = MAX_UPLOAD_BYTES;
@@ -64,6 +75,8 @@ export async function GET() {
           id: string;
           mediaUrl: string;
           caption: string | null;
+          soundName: string | null;
+          soundUrl: string | null;
           createdAt: string;
           expiresAt: string;
           viewedByMe: boolean;
@@ -82,6 +95,8 @@ export async function GET() {
         id: s.id,
         mediaUrl: s.mediaUrl,
         caption: s.caption,
+        soundName: s.soundName,
+        soundUrl: s.soundUrl,
         createdAt: s.createdAt.toISOString(),
         expiresAt: s.expiresAt.toISOString(),
         viewedByMe,
@@ -133,6 +148,9 @@ export async function POST(req: NextRequest) {
         ? String(captionRaw).trim().slice(0, 200)
         : null;
     const file = form.get("media") as File | null;
+    const soundRaw = String(form.get("soundName") || "").trim();
+    const audioFile = form.get("audio") as File | null;
+    const clientDuration = parseClientDuration(form.get("durationSec"));
 
     if (!file || file.size === 0) {
       return NextResponse.json(
@@ -153,6 +171,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (
+      clientDuration != null &&
+      clientDuration > MAX_STORY_DURATION_SEC + 1
+    ) {
+      return NextResponse.json(
+        {
+          error: `Story trop longue (max ${MAX_STORY_DURATION_SEC / 60} minutes).`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (audioFile && audioFile.size > 0) {
+      if (!isAllowedAudioFile(audioFile)) {
+        return NextResponse.json(
+          { error: "Format audio non supporté (mp3, m4a, aac, wav, ogg)." },
+          { status: 400 }
+        );
+      }
+      if (audioFile.size > MAX_AUDIO_BYTES) {
+        return NextResponse.json(
+          { error: `Audio trop lourd (max ${MAX_AUDIO_LABEL}).` },
+          { status: 400 }
+        );
+      }
+    }
+
     const ext =
       path.extname(file.name) ||
       (file.type === "image/png"
@@ -164,26 +209,37 @@ export async function POST(req: NextRequest) {
             : ".jpg");
     const filename = `${randomUUID()}${ext}`;
     const uploadsDir = await ensureUploadDir("stories");
-    const buffer = Buffer.from(await file.arrayBuffer());
     const fullPath = path.join(uploadsDir, filename);
-    await writeFile(fullPath, buffer);
+    // Store as-is — no re-encode
+    await saveUploadFile(file, fullPath);
 
-    const clientDuration = parseClientDuration(form.get("durationSec"));
-    let durationSec = clientDuration;
+    let durationSec: number | null = null;
     const isVid = file.type.startsWith("video/") || ext.toLowerCase() === ".mp4";
     if (isVid) {
-      const probed = await probeDurationSeconds(fullPath);
-      if (probed != null) durationSec = probed;
-      if (
-        (durationSec != null && durationSec > MAX_STORY_DURATION_SEC + 1) ||
-        (clientDuration != null && clientDuration > MAX_STORY_DURATION_SEC + 1)
-      ) {
-        const { unlink } = await import("fs/promises");
+      durationSec = await resolveDurationSeconds(fullPath, clientDuration);
+      if (durationSec != null && durationSec > MAX_STORY_DURATION_SEC + 1) {
         await unlink(fullPath).catch(() => {});
         return NextResponse.json(
-          { error: `Story trop longue (max ${MAX_STORY_DURATION_SEC / 60} minutes).` },
+          {
+            error: `Story trop longue (max ${MAX_STORY_DURATION_SEC / 60} minutes).`,
+          },
           { status: 400 }
         );
+      }
+    }
+
+    let soundUrl: string | null = null;
+    let soundName: string | null = soundRaw || null;
+    if (audioFile && audioFile.size > 0) {
+      const aExt = audioExtFor(audioFile);
+      const aName = `${randomUUID()}${aExt}`;
+      const audioDir = await ensureUploadDir("audio");
+      await saveUploadFile(audioFile, path.join(audioDir, aName));
+      soundUrl = `/uploads/audio/${aName}`;
+      if (!soundName) {
+        soundName =
+          audioFile.name.replace(/\.[^.]+$/, "").trim().slice(0, 60) ||
+          "Musique galerie";
       }
     }
 
@@ -195,6 +251,8 @@ export async function POST(req: NextRequest) {
         userId: session.id,
         mediaUrl: `/uploads/stories/${filename}`,
         caption,
+        soundName,
+        soundUrl,
         durationSec: durationSec ?? null,
         createdAt,
         expiresAt,
@@ -216,6 +274,8 @@ export async function POST(req: NextRequest) {
         id: story.id,
         mediaUrl: story.mediaUrl,
         caption: story.caption,
+        soundName: story.soundName,
+        soundUrl: story.soundUrl,
         createdAt: story.createdAt.toISOString(),
         expiresAt: story.expiresAt.toISOString(),
         viewedByMe: true,

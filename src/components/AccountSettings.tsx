@@ -6,18 +6,22 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronRight, Download, LogOut } from "lucide-react";
 
 type User = {
-  email: string;
+  email: string | null;
   username: string;
   displayName: string | null;
   hasPassword: boolean;
+  phoneE164: string | null;
 };
 
 export default function AccountSettings({ user }: { user: User }) {
   const router = useRouter();
-  const [view, setView] = useState<"menu" | "info" | "password">("menu");
+  const [view, setView] = useState<"menu" | "info" | "password" | "phone">("menu");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState("+221");
+  const [phone, setPhone] = useState("");
+  const [phoneSaved, setPhoneSaved] = useState(user.phoneE164);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,11 +61,38 @@ export default function AccountSettings({ user }: { user: User }) {
     }
   }
 
+  async function onAddPhone(e: FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    setMsg(null);
+    setLoading(true);
+    try {
+      const phoneE164 = `${phoneCountry}${phone.replace(/\D/g, "")}`;
+      const res = await fetch("/api/users/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneE164, phoneCountry }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(data.error || "Échec");
+        return;
+      }
+      setPhoneSaved(data.user?.phoneE164 || phoneE164);
+      setMsg("Téléphone ajouté.");
+      setView("menu");
+      router.refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (view === "info") {
     return (
       <Shell title="Informations du compte" onBack={() => setView("menu")}>
         <div className="rounded-xl bg-white/[0.06] border border-white/10 divide-y divide-white/5">
-          <Row label="E-mail" value={user.email} />
+          <Row label="E-mail" value={user.email || "— (non renseigné)"} />
+          <Row label="Téléphone" value={phoneSaved || "— (non renseigné)"} />
           <Row label="Nom d'utilisateur" value={`@${user.username}`} />
           <Row label="Nom" value={user.displayName || "—"} />
         </div>
@@ -125,8 +156,63 @@ export default function AccountSettings({ user }: { user: User }) {
     );
   }
 
+  if (view === "phone") {
+    return (
+      <Shell title="Ajouter un téléphone" onBack={() => setView("menu")}>
+        <p className="text-sm text-white/50 mb-4">
+          Ajoutez un numéro pour sécuriser votre compte (pas de SMS OTP dans
+          cette version).
+        </p>
+        <form onSubmit={onAddPhone} className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={phoneCountry}
+              onChange={(e) => setPhoneCountry(e.target.value)}
+              className="w-20 bg-white/10 rounded-lg px-2 py-2.5 text-sm outline-none"
+              placeholder="+221"
+              required
+            />
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="flex-1 bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#25f4ee]/50"
+              placeholder="77 000 00 00"
+              required
+            />
+          </div>
+          {err && <p className="text-sm text-[#fe2c55]">{err}</p>}
+          {msg && <p className="text-sm text-emerald-400">{msg}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#fe2c55] font-semibold py-2.5 rounded-lg disabled:opacity-50"
+          >
+            {loading ? "…" : "Enregistrer le téléphone"}
+          </button>
+        </form>
+      </Shell>
+    );
+  }
+
   return (
     <Shell title="Compte" backHref="/parametres">
+      {user.email && !phoneSaved && (
+        <button
+          type="button"
+          onClick={() => setView("phone")}
+          className="mb-4 w-full text-left rounded-xl border border-[#d4af37]/40 bg-[#d4af37]/10 px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-[#d4af37]">
+            Ajouter un téléphone
+          </p>
+          <p className="text-xs text-white/50 mt-0.5">
+            Sécurisez votre compte e-mail avec un numéro (optionnel).
+          </p>
+        </button>
+      )}
+
       <div className="rounded-xl bg-white/[0.06] border border-white/10 overflow-hidden divide-y divide-white/5">
         <button
           type="button"
@@ -149,6 +235,21 @@ export default function AccountSettings({ user }: { user: User }) {
           </div>
           <ChevronRight size={18} className="text-white/30 shrink-0" />
         </button>
+        {!phoneSaved && (
+          <button
+            type="button"
+            onClick={() => setView("phone")}
+            className="w-full flex items-center justify-between px-4 py-4 hover:bg-white/5 text-left"
+          >
+            <div>
+              <p className="font-medium">Ajouter un téléphone</p>
+              <p className="text-xs text-white/40 mt-0.5">
+                Optionnel — sécurité du compte
+              </p>
+            </div>
+            <ChevronRight size={18} className="text-white/30 shrink-0" />
+          </button>
+        )}
         <a
           href="/api/me/export"
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-white/5 text-left"

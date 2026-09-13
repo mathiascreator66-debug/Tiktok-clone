@@ -13,66 +13,95 @@ export default async function ActivitePage() {
 
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const [likes, comments, followers, saves] = await Promise.all([
-    prisma.like.findMany({
-      where: {
-        createdAt: { gte: since },
-        video: { userId: session.id },
-        NOT: { userId: session.id },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 40,
-      include: {
-        user: {
-          select: { username: true, displayName: true, avatarUrl: true },
+  const [likes, comments, followers, saves, storyComments, storyReactions] =
+    await Promise.all([
+      prisma.like.findMany({
+        where: {
+          createdAt: { gte: since },
+          video: { userId: session.id },
+          NOT: { userId: session.id },
         },
-        video: { select: { id: true, caption: true } },
-      },
-    }),
-    prisma.comment.findMany({
-      where: {
-        createdAt: { gte: since },
-        video: { userId: session.id },
-        NOT: { userId: session.id },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 40,
-      include: {
-        user: {
-          select: { username: true, displayName: true, avatarUrl: true },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          user: {
+            select: { username: true, displayName: true, avatarUrl: true },
+          },
+          video: { select: { id: true, caption: true } },
         },
-        video: { select: { id: true, caption: true } },
-      },
-    }),
-    prisma.follow.findMany({
-      where: {
-        followingId: session.id,
-        createdAt: { gte: since },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 40,
-      include: {
-        follower: {
-          select: { username: true, displayName: true, avatarUrl: true },
+      }),
+      prisma.comment.findMany({
+        where: {
+          createdAt: { gte: since },
+          video: { userId: session.id },
+          NOT: { userId: session.id },
         },
-      },
-    }),
-    prisma.bookmark.findMany({
-      where: {
-        createdAt: { gte: since },
-        video: { userId: session.id },
-        NOT: { userId: session.id },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 40,
-      include: {
-        user: {
-          select: { username: true, displayName: true, avatarUrl: true },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          user: {
+            select: { username: true, displayName: true, avatarUrl: true },
+          },
+          video: { select: { id: true, caption: true } },
         },
-        video: { select: { id: true, caption: true } },
-      },
-    }),
-  ]);
+      }),
+      prisma.follow.findMany({
+        where: {
+          followingId: session.id,
+          createdAt: { gte: since },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          follower: {
+            select: { username: true, displayName: true, avatarUrl: true },
+          },
+        },
+      }),
+      prisma.bookmark.findMany({
+        where: {
+          createdAt: { gte: since },
+          video: { userId: session.id },
+          NOT: { userId: session.id },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          user: {
+            select: { username: true, displayName: true, avatarUrl: true },
+          },
+          video: { select: { id: true, caption: true } },
+        },
+      }),
+      prisma.storyComment.findMany({
+        where: {
+          createdAt: { gte: since },
+          story: { userId: session.id },
+          NOT: { userId: session.id },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          user: {
+            select: { username: true, displayName: true, avatarUrl: true },
+          },
+        },
+      }),
+      prisma.storyReaction.findMany({
+        where: {
+          createdAt: { gte: since },
+          story: { userId: session.id },
+          NOT: { userId: session.id },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          user: {
+            select: { username: true, displayName: true, avatarUrl: true },
+          },
+        },
+      }),
+    ]);
 
   const items = [
     ...likes.map((l) => ({
@@ -108,6 +137,22 @@ export default async function ActivitePage() {
       text: `a enregistré votre vidéo « ${s.video.caption.slice(0, 40)}${
         s.video.caption.length > 40 ? "…" : ""
       } »`,
+    })),
+    ...storyComments.map((c) => ({
+      id: `story-comment-${c.id}`,
+      kind: "story_comment" as const,
+      at: c.createdAt.toISOString(),
+      user: c.user,
+      text: `a répondu à votre story : « ${c.content.slice(0, 60)}${
+        c.content.length > 60 ? "…" : ""
+      } »`,
+    })),
+    ...storyReactions.map((r) => ({
+      id: `story-reaction-${r.id}`,
+      kind: "story_reaction" as const,
+      at: r.createdAt.toISOString(),
+      user: r.user,
+      text: `a réagi ${r.emoji} à votre story`,
     })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 

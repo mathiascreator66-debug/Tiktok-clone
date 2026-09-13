@@ -142,6 +142,7 @@ export default function StoryRail({ isLoggedIn, currentUsername }: Props) {
           groups={groups}
           startGroupIndex={viewerIndex}
           isLoggedIn={isLoggedIn}
+          currentUsername={currentUsername}
           onClose={() => setViewerIndex(null)}
           onViewed={onViewed}
         />

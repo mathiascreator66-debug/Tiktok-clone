@@ -7,6 +7,7 @@ import BrandLogo from "./BrandLogo";
 import { COUNTRIES, LANG_OPTIONS } from "@/lib/countries";
 
 type Mode = "login" | "register";
+type IdMethod = "email" | "phone";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   google_non_configure: "Connexion Google non configurée sur ce serveur.",
@@ -24,6 +25,7 @@ export default function AuthForm({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [idMethod, setIdMethod] = useState<IdMethod>("email");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -44,22 +46,29 @@ export default function AuthForm({
     setError("");
     try {
       const url = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-      const body =
-        mode === "login"
-          ? { email, password }
-          : {
-              email,
-              username,
-              password,
-              country,
-              language,
-              birthdate,
-              phoneE164: phone.trim()
-                ? `${phoneCountry}${phone.replace(/\D/g, "")}`
-                : undefined,
-              phoneCountry,
-              acceptCgu,
-            };
+      let body: Record<string, unknown>;
+      if (mode === "login") {
+        const identifier =
+          idMethod === "email"
+            ? email.trim()
+            : `${phoneCountry}${phone.replace(/\D/g, "")}`;
+        body = { identifier, password };
+      } else {
+        body = {
+          username,
+          password,
+          country,
+          language,
+          birthdate,
+          acceptCgu,
+          ...(idMethod === "email"
+            ? { email: email.trim() }
+            : {
+                phoneE164: `${phoneCountry}${phone.replace(/\D/g, "")}`,
+                phoneCountry,
+              }),
+        };
+      }
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -137,18 +146,71 @@ export default function AuthForm({
           <div className="flex-1 h-px bg-white/10" />
         </div>
 
+        <div className="flex gap-1 p-1 rounded-full bg-white/5">
+          <button
+            type="button"
+            onClick={() => setIdMethod("email")}
+            className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
+              idMethod === "email"
+                ? "bg-white text-black"
+                : "text-white/60 hover:bg-white/10"
+            }`}
+          >
+            E-mail
+          </button>
+          <button
+            type="button"
+            onClick={() => setIdMethod("phone")}
+            className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition ${
+              idMethod === "phone"
+                ? "bg-white text-black"
+                : "text-white/60 hover:bg-white/10"
+            }`}
+          >
+            Téléphone
+          </button>
+        </div>
+
         <form onSubmit={submit} className="space-y-3">
-          <div>
-            <label className="block text-xs text-white/50 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
-              placeholder="vous@exemple.com"
-            />
-          </div>
+          {idMethod === "email" ? (
+            <div>
+              <label className="block text-xs text-white/50 mb-1">E-mail</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
+                placeholder="vous@exemple.com"
+                autoComplete="email"
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs text-white/50 mb-1">
+                Téléphone
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={phoneCountry}
+                  onChange={(e) => setPhoneCountry(e.target.value)}
+                  className="w-20 bg-white/10 rounded-lg px-2 py-2.5 text-sm outline-none"
+                  placeholder="+221"
+                  required
+                />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  className="flex-1 bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
+                  placeholder="77 000 00 00"
+                  autoComplete="tel"
+                />
+              </div>
+            </div>
+          )}
 
           {mode === "register" && (
             <>
@@ -207,27 +269,6 @@ export default function AuthForm({
                   required
                   className="w-full bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
                 />
-              </div>
-              <div>
-                <label className="block text-xs text-white/50 mb-1">
-                  Téléphone (optionnel — SMS phase 2)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={phoneCountry}
-                    onChange={(e) => setPhoneCountry(e.target.value)}
-                    className="w-20 bg-white/10 rounded-lg px-2 py-2.5 text-sm outline-none"
-                    placeholder="+221"
-                  />
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="flex-1 bg-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#d4af37]"
-                    placeholder="77 000 00 00"
-                  />
-                </div>
               </div>
               <label className="flex items-start gap-2 text-xs text-white/70 cursor-pointer">
                 <input
