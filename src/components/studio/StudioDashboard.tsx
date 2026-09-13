@@ -13,7 +13,7 @@ import {
   Clapperboard,
 } from "lucide-react";
 import { LineChart } from "./StudioCharts";
-import type { StudioRange } from "@/lib/studio";
+import type { StudioRange } from "@/lib/studio-types";
 
 type Delta = { text: string; positive: boolean | null };
 

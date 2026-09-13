@@ -2,22 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { ageFromBirthdate } from "@/lib/auth";
 import { formatCount } from "@/lib/format";
 import { formatEuros } from "@/lib/wallet-shared";
+import {
+  type StudioRange,
+  RANGE_LABELS,
+  SOURCE_LABELS,
+} from "@/lib/studio-types";
 
-export type StudioRange = "1d" | "7d" | "28d";
-
-export const RANGE_LABELS: Record<StudioRange, string> = {
-  "28d": "28 jours",
-  "7d": "7 jours",
-  "1d": "Aujourd’hui",
-};
-
-export const SOURCE_LABELS: Record<string, string> = {
-  pour_toi: "Pour toi",
-  profil: "Profil",
-  recherche: "Recherche",
-  abonnements: "Abonnements",
-  autre: "Autre",
-};
+export type { StudioRange };
+export { RANGE_LABELS, SOURCE_LABELS };
 
 export function parseRange(raw: string | null): StudioRange {
   if (raw === "1d" || raw === "7d" || raw === "28d") return raw;

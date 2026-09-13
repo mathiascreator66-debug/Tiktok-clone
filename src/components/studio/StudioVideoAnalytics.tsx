@@ -12,7 +12,7 @@ import {
   Clock,
 } from "lucide-react";
 import { LineChart, RetentionChart, BarRow } from "./StudioCharts";
-import type { StudioRange } from "@/lib/studio";
+import type { StudioRange } from "@/lib/studio-types";
 import { formatCount } from "@/lib/format";
 
 type Header = {
