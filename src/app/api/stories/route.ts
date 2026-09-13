@@ -157,6 +157,8 @@ export async function POST(req: NextRequest) {
       captionRaw != null && String(captionRaw).trim()
         ? String(captionRaw).trim().slice(0, 200)
         : null;
+    const isAiGeneratedRaw = String(form.get("isAiGenerated") ?? "false").trim().toLowerCase();
+    const isAiGenerated = ["1", "true", "yes", "on"].includes(isAiGeneratedRaw);
     const file = form.get("media") as File | null;
     const soundRaw = String(form.get("soundName") || "").trim();
     const audioFile = form.get("audio") as File | null;
@@ -270,6 +272,7 @@ export async function POST(req: NextRequest) {
         userId: session.id,
         mediaUrl: `/uploads/stories/${filename}`,
         caption,
+        isAiGenerated,
         soundName,
         soundUrl,
         originalVolume,
@@ -297,6 +300,7 @@ export async function POST(req: NextRequest) {
         id: story.id,
         mediaUrl: story.mediaUrl,
         caption: story.caption,
+        isAiGenerated: story.isAiGenerated,
         soundName: story.soundName,
         soundUrl: story.soundUrl,
         originalVolume: story.originalVolume,

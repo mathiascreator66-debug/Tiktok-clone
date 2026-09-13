@@ -51,10 +51,18 @@ export async function PATCH(
       textOverlays?: string | null;
       captions?: string | null;
       allowDownload?: boolean;
+      isAiGenerated?: boolean;
+      isPremiumSubscribersOnly?: boolean;
     } = { caption };
 
     if (typeof body.allowDownload === "boolean") {
       data.allowDownload = body.allowDownload;
+    }
+    if (typeof body.isAiGenerated === "boolean") {
+      data.isAiGenerated = body.isAiGenerated;
+    }
+    if (typeof body.isPremiumSubscribersOnly === "boolean") {
+      data.isPremiumSubscribersOnly = body.isPremiumSubscribersOnly;
     }
 
     if (body.soundVolume != null) {

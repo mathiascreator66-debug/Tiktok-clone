@@ -16,7 +16,7 @@ type DbComment = {
   createdAt: Date;
   parentId: string | null;
   imageUrl: string | null;
-  user: { id: string; username: string; avatarUrl: string | null; isVerified?: boolean; isPro?: boolean };
+  user: { id: string; username: string; avatarUrl: string | null; isVerified?: boolean; isPro?: boolean; isCreatorSubscriber?: boolean };
   _count: { likes: number };
   likes: { id: string }[];
 };
@@ -59,6 +59,10 @@ export async function GET(
     const session = await getSession();
     const sort = req.nextUrl.searchParams.get("sort") === "popular" ? "popular" : "recent";
 
+    const video = await prisma.video.findUnique({
+      where: { id: params.id },
+      select: { userId: true },
+    });
     const comments = await prisma.comment.findMany({
       where: { videoId: params.id },
       include: {
@@ -70,7 +74,28 @@ export async function GET(
       },
     });
 
-    const flat = comments as unknown as DbComment[];
+    const fanIds = Array.from(new Set(comments.map((c) => c.userId)));
+    const subSet = new Set<string>();
+    if (video && fanIds.length) {
+      const subs = await prisma.creatorSubscriber.findMany({
+        where: {
+          creatorId: video.userId,
+          fanId: { in: fanIds },
+          status: "ACTIVE",
+          until: { gt: new Date() },
+        },
+        select: { fanId: true },
+      });
+      for (const s of subs) subSet.add(s.fanId);
+    }
+
+    const flat = comments.map((c) => ({
+      ...c,
+      user: {
+        ...c.user,
+        isCreatorSubscriber: subSet.has(c.userId),
+      },
+    })) as unknown as DbComment[];
 
     // Sort top-level by recent or popular; replies always by createdAt asc (conversation order)
     const nested = nestComments(flat);

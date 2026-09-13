@@ -9,9 +9,13 @@ type Props = {
   caption: string;
   pinned?: boolean;
   boostedUntil?: string | null;
+  isAiGenerated?: boolean;
+  isPremiumSubscribersOnly?: boolean;
   onCaptionUpdated?: (caption: string) => void;
   onPinned?: (pinned: boolean) => void;
   onBoosted?: (boostedUntil: string) => void;
+  onAiGenerated?: (v: boolean) => void;
+  onPremiumOnly?: (v: boolean) => void;
   onDeleted?: () => void;
   /** Compact icon for feed */
   variant?: "feed" | "grid";
@@ -22,9 +26,13 @@ export default function VideoOwnerMenu({
   caption,
   pinned = false,
   boostedUntil = null,
+  isAiGenerated = false,
+  isPremiumSubscribersOnly = false,
   onCaptionUpdated,
   onPinned,
   onBoosted,
+  onAiGenerated,
+  onPremiumOnly,
   onDeleted,
   variant = "feed",
 }: Props) {
@@ -36,6 +44,8 @@ export default function VideoOwnerMenu({
   const [error, setError] = useState("");
   const [isPinned, setIsPinned] = useState(pinned);
   const [boostUntil, setBoostUntil] = useState<string | null>(boostedUntil);
+  const [aiFlag, setAiFlag] = useState(isAiGenerated);
+  const [premiumFlag, setPremiumFlag] = useState(isPremiumSubscribersOnly);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -147,6 +157,39 @@ export default function VideoOwnerMenu({
     }
   }
 
+
+  async function patchFlags(patch: Record<string, boolean>) {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/videos/${videoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caption, ...patch }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Erreur");
+        return;
+      }
+      if ("isAiGenerated" in patch) {
+        setAiFlag(patch.isAiGenerated!);
+        onAiGenerated?.(patch.isAiGenerated!);
+      }
+      if ("isPremiumSubscribersOnly" in patch) {
+        setPremiumFlag(patch.isPremiumSubscribersOnly!);
+        onPremiumOnly?.(patch.isPremiumSubscribersOnly!);
+      }
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError("Erreur réseau.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -221,6 +264,25 @@ export default function VideoOwnerMenu({
               {error && !editing && (
                 <p className="px-3 py-1.5 text-[11px] text-[#fe2c55]">{error}</p>
               )}
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/10 text-left"
+                onClick={() => patchFlags({ isAiGenerated: !aiFlag })}
+                disabled={loading}
+              >
+                <span className="text-xs">{aiFlag ? "✓" : "○"}</span> Contenu IA
+              </button>
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/10 text-left"
+                onClick={() =>
+                  patchFlags({ isPremiumSubscribersOnly: !premiumFlag })
+                }
+                disabled={loading}
+              >
+                <span className="text-xs">{premiumFlag ? "✓" : "○"}</span>{" "}
+                Premium abonnés
+              </button>
               <button
                 type="button"
                 className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-white/10 text-[#fe2c55] text-left"

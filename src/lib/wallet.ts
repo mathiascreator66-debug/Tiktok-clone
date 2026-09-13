@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { getGiftById, giftFeeCents } from "./gifts";
 import {
   BOOST_COST_CENTS,
   BOOST_DURATION_MS,
@@ -26,6 +27,8 @@ export async function creditDemo(userId: string, amountCents = DEMO_CREDIT_CENTS
         userId,
         type: "credit",
         amountCents,
+        provider: "WALLET",
+        status: "COMPLETED",
         meta: JSON.stringify({
           demo: true,
           note: "Crédit démo — pas d'argent réel",
@@ -247,4 +250,225 @@ export async function activatePro(opts: {
       trial: false,
     };
   });
+}
+
+export async function sendVideoGift(opts: {
+  fromUserId: string;
+  videoId: string;
+  giftId: string;
+  provider?: string;
+}) {
+  const { fromUserId, videoId, giftId, provider = "WALLET" } = opts;
+  const gift = getGiftById(giftId);
+  if (!gift) throw new Error("INVALID_GIFT");
+
+  const fee = giftFeeCents(gift.priceCents);
+  const net = gift.priceCents - fee;
+
+  return prisma.$transaction(async (tx) => {
+    const video = await tx.video.findUnique({
+      where: { id: videoId },
+      select: { id: true, userId: true },
+    });
+    if (!video) throw new Error("NOT_FOUND");
+    if (video.userId === fromUserId) throw new Error("SELF_GIFT");
+
+    const sender = await tx.user.findUnique({ where: { id: fromUserId } });
+    if (!sender) throw new Error("NOT_FOUND");
+    if (sender.balanceCents < gift.priceCents) throw new Error("INSUFFICIENT");
+
+    const updatedSender = await tx.user.update({
+      where: { id: fromUserId },
+      data: { balanceCents: { decrement: gift.priceCents } },
+      select: { balanceCents: true },
+    });
+    await tx.user.update({
+      where: { id: video.userId },
+      data: { balanceCents: { increment: net } },
+    });
+
+    const videoGift = await tx.videoGift.create({
+      data: {
+        giftId: gift.id,
+        amountCents: gift.priceCents,
+        feeCents: fee,
+        videoId,
+        senderId: fromUserId,
+        receiverId: video.userId,
+        provider,
+      },
+    });
+
+    await tx.transaction.create({
+      data: {
+        userId: fromUserId,
+        type: "gift_sent",
+        amountCents: -gift.priceCents,
+        provider,
+        status: "COMPLETED",
+        meta: JSON.stringify({
+          demo: true,
+          note: `Cadeau ${gift.emoji} ${gift.label} — démo`,
+          giftId: gift.id,
+          giftLabel: gift.label,
+          videoId,
+          counterpartyId: video.userId,
+          feeCents: fee,
+          videoGiftId: videoGift.id,
+        }),
+      },
+    });
+    await tx.transaction.create({
+      data: {
+        userId: video.userId,
+        type: "gift_received",
+        amountCents: net,
+        provider,
+        status: "COMPLETED",
+        meta: JSON.stringify({
+          demo: true,
+          note: `Cadeau reçu ${gift.emoji} ${gift.label} — démo`,
+          giftId: gift.id,
+          giftLabel: gift.label,
+          videoId,
+          counterpartyId: fromUserId,
+          feeCents: fee,
+          grossCents: gift.priceCents,
+          videoGiftId: videoGift.id,
+        }),
+      },
+    });
+
+    return {
+      balanceCents: updatedSender.balanceCents,
+      gift,
+      feeCents: fee,
+      netCents: net,
+      videoGiftId: videoGift.id,
+      receiverId: video.userId,
+    };
+  });
+}
+
+export const CREATOR_SUB_DAYS = 30;
+export const CREATOR_SUB_PLATFORM_FEE_BPS = 1000; // 10 %
+
+export async function subscribeToCreator(opts: {
+  fanId: string;
+  creatorId: string;
+  provider?: string;
+}) {
+  const { fanId, creatorId, provider = "WALLET" } = opts;
+  if (fanId === creatorId) throw new Error("SELF_SUB");
+
+  return prisma.$transaction(async (tx) => {
+    const plan = await tx.creatorSubscriptionPlan.findUnique({
+      where: { creatorId },
+    });
+    if (!plan || !plan.active) throw new Error("NO_PLAN");
+    if (plan.priceCents < 50) throw new Error("INVALID_PRICE");
+
+    const fan = await tx.user.findUnique({ where: { id: fanId } });
+    if (!fan) throw new Error("NOT_FOUND");
+    if (fan.balanceCents < plan.priceCents) throw new Error("INSUFFICIENT");
+
+    const fee = Math.floor((plan.priceCents * CREATOR_SUB_PLATFORM_FEE_BPS) / 10_000);
+    const net = plan.priceCents - fee;
+    const now = Date.now();
+
+    const existing = await tx.creatorSubscriber.findUnique({
+      where: { fanId_creatorId: { fanId, creatorId } },
+    });
+    const base =
+      existing &&
+      existing.status === "ACTIVE" &&
+      existing.until.getTime() > now
+        ? existing.until.getTime()
+        : now;
+    const until = new Date(base + CREATOR_SUB_DAYS * 24 * 60 * 60 * 1000);
+
+    const updatedFan = await tx.user.update({
+      where: { id: fanId },
+      data: { balanceCents: { decrement: plan.priceCents } },
+      select: { balanceCents: true },
+    });
+    await tx.user.update({
+      where: { id: creatorId },
+      data: { balanceCents: { increment: net } },
+    });
+
+    const sub = await tx.creatorSubscriber.upsert({
+      where: { fanId_creatorId: { fanId, creatorId } },
+      create: {
+        fanId,
+        creatorId,
+        planId: plan.id,
+        status: "ACTIVE",
+        until,
+        provider,
+      },
+      update: {
+        planId: plan.id,
+        status: "ACTIVE",
+        until,
+        provider,
+      },
+    });
+
+    await tx.transaction.create({
+      data: {
+        userId: fanId,
+        type: "creator_sub",
+        amountCents: -plan.priceCents,
+        provider,
+        status: "COMPLETED",
+        meta: JSON.stringify({
+          demo: true,
+          note: "Abonnement Premium créateur (démo — pas AfriVoix Pro ni badge certifié)",
+          creatorId,
+          until: until.toISOString(),
+          feeCents: fee,
+        }),
+      },
+    });
+    await tx.transaction.create({
+      data: {
+        userId: creatorId,
+        type: "creator_sub",
+        amountCents: net,
+        provider,
+        status: "COMPLETED",
+        meta: JSON.stringify({
+          demo: true,
+          note: "Abonnement Premium reçu (démo)",
+          fanId,
+          until: until.toISOString(),
+          feeCents: fee,
+          grossCents: plan.priceCents,
+        }),
+      },
+    });
+
+    return {
+      balanceCents: updatedFan.balanceCents,
+      until,
+      sub,
+      feeCents: fee,
+      netCents: net,
+      priceCents: plan.priceCents,
+    };
+  });
+}
+
+export async function isActiveCreatorSubscriber(
+  fanId: string | null | undefined,
+  creatorId: string
+): Promise<boolean> {
+  if (!fanId) return false;
+  if (fanId === creatorId) return true;
+  const sub = await prisma.creatorSubscriber.findUnique({
+    where: { fanId_creatorId: { fanId, creatorId } },
+  });
+  if (!sub || sub.status !== "ACTIVE") return false;
+  return sub.until.getTime() > Date.now();
 }

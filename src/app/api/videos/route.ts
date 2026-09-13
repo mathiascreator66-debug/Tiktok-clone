@@ -89,6 +89,10 @@ export async function POST(req: NextRequest) {
     const captionsRaw = String(form.get("captions") || "").trim();
     const allowDownloadRaw = String(form.get("allowDownload") ?? "true").trim().toLowerCase();
     const allowDownload = !["0", "false", "no", "off"].includes(allowDownloadRaw);
+    const isAiGeneratedRaw = String(form.get("isAiGenerated") ?? "false").trim().toLowerCase();
+    const isAiGenerated = ["1", "true", "yes", "on"].includes(isAiGeneratedRaw);
+    const isPremiumRaw = String(form.get("isPremiumSubscribersOnly") ?? "false").trim().toLowerCase();
+    const isPremiumSubscribersOnly = ["1", "true", "yes", "on"].includes(isPremiumRaw);
     // Optional: reuse existing gallery sound by URL (no re-upload)
     const reuseSoundUrl = String(form.get("reuseSoundUrl") || "").trim();
     const reuseSoundName = String(form.get("reuseSoundName") || "").trim();
@@ -235,6 +239,8 @@ export async function POST(req: NextRequest) {
         textOverlays,
         captions,
         allowDownload,
+        isAiGenerated,
+        isPremiumSubscribersOnly,
         userId: session.id,
         durationSec: durationSec ?? null,
       },
@@ -281,6 +287,8 @@ export async function POST(req: NextRequest) {
         pinned: false,
         boostedUntil: null,
         allowDownload: video.allowDownload,
+        isAiGenerated: video.isAiGenerated,
+        isPremiumSubscribersOnly: video.isPremiumSubscribersOnly,
         hashtags: tags,
         user: video.user,
         repost: null,

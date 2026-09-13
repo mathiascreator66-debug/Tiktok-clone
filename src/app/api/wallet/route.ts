@@ -35,6 +35,8 @@ export async function GET() {
         id: t.id,
         type: t.type,
         amountCents: t.amountCents,
+        provider: t.provider,
+        status: t.status,
         meta: t.meta ? safeJson(t.meta) : null,
         createdAt: t.createdAt.toISOString(),
       })),

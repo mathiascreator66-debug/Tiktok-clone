@@ -75,6 +75,12 @@ model User {
   postComments  PostComment[]
   blocksInitiated Block[] @relation("Blocker")
   blocksReceived  Block[] @relation("Blocked")
+  paymentMethods  UserPaymentMethod[]
+  giftsSent       VideoGift[]              @relation("GiftSender")
+  giftsReceived   VideoGift[]              @relation("GiftReceiver")
+  creatorPlan     CreatorSubscriptionPlan?
+  creatorSubs     CreatorSubscriber[]      @relation("CreatorSubs")
+  fanSubs         CreatorSubscriber[]      @relation("FanSubs")
 }
 
 model Video {
@@ -108,6 +114,10 @@ model Video {
   boostedUntil  DateTime?
   /// Author allows viewers to download the video file
   allowDownload Boolean         @default(true)
+  /// Réservé aux abonnés Premium du créateur (≠ badge certifié ≠ AfriVoix Pro)
+  isPremiumSubscribersOnly Boolean @default(false)
+  /// Contenu généré par l'IA (transparence type TikTok/YouTube)
+  isAiGenerated Boolean @default(false)
   createdAt     DateTime        @default(now())
   userId        String
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -120,6 +130,7 @@ model Video {
   watchEvents   WatchEvent[]
   hashtags      VideoHashtag[]
   playlistItems PlaylistItem[]
+  gifts         VideoGift[]
 
   @@index([userId, pinnedAt])
 }
@@ -244,6 +255,8 @@ model Story {
   userId      String
   mediaUrl    String
   caption     String?
+  /// Contenu généré par l'IA
+  isAiGenerated Boolean       @default(false)
   soundName   String?
   /// Gallery-uploaded audio; mixes with original (do not force-mute original)
   soundUrl    String?
@@ -386,13 +399,110 @@ model Transaction {
   /// credit | debit | tip_sent | tip_received | boost | subscription
   type        String
   amountCents Int
+  /// MTN | MOOV | ORANGE | WAVE | PAYPAL | CRYPTO | WALLET | null
+  provider    String?
+  /// PENDING | COMPLETED | FAILED
+  status      String   @default("COMPLETED")
   /// JSON optionnel : { note, feeCents, counterpartyId, videoId, demo: true, ... }
   meta        String?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([status])
 }
+
+/// Config plateforme : quels moyens de paiement sont actifs par pays
+model PaymentMethodConfig {
+  id          String   @id @default(cuid())
+  /// ISO 3166-1 alpha-2, ou "*" pour international / global
+  countryCode String
+  /// MTN | MOOV | ORANGE | WAVE | PAYPAL | CRYPTO
+  provider    String
+  enabled     Boolean  @default(true)
+  currency    String   @default("XOF")
+  /// JSON optionnel (réseaux crypto, libellés, etc.)
+  metadata    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([countryCode, provider])
+  @@index([countryCode, enabled])
+}
+
+/// Moyens de paiement / payout enregistrés par l'utilisateur
+model UserPaymentMethod {
+  id            String   @id @default(cuid())
+  userId        String
+  /// MTN | MOOV | ORANGE | WAVE | PAYPAL | CRYPTO
+  provider      String
+  label         String?
+  phoneE164     String?
+  email         String?
+  walletAddress String?
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+}
+
+/// Cadeau envoyé sur une vidéo (catalogue fixe côté code — démo crédits)
+model VideoGift {
+  id          String   @id @default(cuid())
+  /// Identifiant catalogue : heart | rose | fire | lion | crown | diamond …
+  giftId      String
+  amountCents Int
+  feeCents    Int      @default(0)
+  videoId     String
+  senderId    String
+  receiverId  String
+  /// WALLET | MTN | … (souvent WALLET après recharge démo)
+  provider    String?  @default("WALLET")
+  createdAt   DateTime @default(now())
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  sender      User     @relation("GiftSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("GiftReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([videoId, createdAt])
+  @@index([receiverId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+/// Offre Premium fan→créateur (≠ isVerified badge certifié, ≠ AfriVoix Pro plateforme)
+model CreatorSubscriptionPlan {
+  id         String   @id @default(cuid())
+  creatorId  String   @unique
+  priceCents Int
+  /// Texte avantages (FR)
+  perks      String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  creator    User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  subscribers CreatorSubscriber[]
+}
+
+model CreatorSubscriber {
+  id        String   @id @default(cuid())
+  fanId     String
+  creatorId String
+  planId    String?
+  /// ACTIVE | EXPIRED | CANCELLED
+  status    String   @default("ACTIVE")
+  until     DateTime
+  /// WALLET | MTN | …
+  provider  String?
+  createdAt DateTime @default(now())
+  fan       User     @relation("FanSubs", fields: [fanId], references: [id], onDelete: Cascade)
+  creator   User     @relation("CreatorSubs", fields: [creatorId], references: [id], onDelete: Cascade)
+  plan      CreatorSubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@unique([fanId, creatorId])
+  @@index([creatorId, status])
+  @@index([fanId, status])
+}
+
 
 model AdminAction {
   id         String   @id @default(cuid())
@@ -570,6 +680,8 @@ model Post {
   id         String        @id @default(cuid())
   authorId   String
   content    String
+  /// Contenu généré par l'IA
+  isAiGenerated Boolean    @default(false)
   /// PUBLIC | FOLLOWERS
   visibility String        @default("PUBLIC")
   createdAt  DateTime      @default(now())

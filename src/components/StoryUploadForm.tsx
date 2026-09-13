@@ -24,6 +24,7 @@ export default function StoryUploadForm() {
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const galleryAudioRef = useRef<HTMLAudioElement>(null);
   const [caption, setCaption] = useState("");
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isVideo, setIsVideo] = useState(false);
@@ -157,6 +158,7 @@ export default function StoryUploadForm() {
     try {
       const form = new FormData();
       if (caption.trim()) form.append("caption", caption.trim());
+      form.append("isAiGenerated", isAiGenerated ? "true" : "false");
       form.append("media", file);
       if (durationSec != null) form.append("durationSec", String(durationSec));
       form.append("originalVolume", String(originalVolume));
@@ -424,6 +426,18 @@ export default function StoryUploadForm() {
           </p>
         </div>
       )}
+
+      <label className="flex items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3 cursor-pointer">
+        <span className="text-sm">
+          <span className="font-medium">Contenu généré par l&apos;IA</span>
+        </span>
+        <input
+          type="checkbox"
+          checked={isAiGenerated}
+          onChange={(e) => setIsAiGenerated(e.target.checked)}
+          className="w-5 h-5 accent-[#fe2c55]"
+        />
+      </label>
 
       <button
         type="submit"

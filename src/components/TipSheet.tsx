@@ -104,7 +104,8 @@ export default function TipSheet({
         </div>
 
         <p className="px-4 text-[11px] text-amber-200/70 mb-3">
-          Démo — crédits virtuels. Frais plateforme 10 % (note système).
+          Pourboire (montant libre) — distinct des cadeaux vidéo (catalogue emoji).
+          Démo — crédits virtuels. Frais plateforme 10 %.
         </p>
 
         {balanceCents !== null && (

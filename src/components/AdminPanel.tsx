@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Shield } from "lucide-react";
+import { ArrowLeft, Shield, CreditCard } from "lucide-react";
 import BrandLogo from "./BrandLogo";
 import VerifiedBadge from "./VerifiedBadge";
 
@@ -63,6 +63,7 @@ export default function AdminPanel({
   tickets: TicketRow[];
 }) {
   const [tab, setTab] = useState<"users" | "reports" | "tickets" | "log">("users");
+  // paiements: page dédiée /admin/paiements
   const [users, setUsers] = useState(initialUsers);
   const [reports, setReports] = useState(initialReports);
   const [actions, setActions] = useState(initialActions);
@@ -151,6 +152,14 @@ export default function AdminPanel({
         ))}
       </div>
 
+      <div className="px-3 mb-3">
+        <Link
+          href="/admin/paiements"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-[#25f4ee] bg-white/5 border border-white/10 rounded-xl px-3 py-2"
+        >
+          <CreditCard size={16} /> Paiements par pays
+        </Link>
+      </div>
       {msg && (
         <p className="mb-3 text-sm text-[#d4af37] bg-[#d4af37]/10 rounded-lg px-3 py-2">
           {msg}

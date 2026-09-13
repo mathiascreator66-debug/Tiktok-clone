@@ -13,8 +13,11 @@ export type TxType =
   | "debit"
   | "tip_sent"
   | "tip_received"
+  | "gift_sent"
+  | "gift_received"
   | "boost"
-  | "subscription";
+  | "subscription"
+  | "creator_sub";
 
 export function formatEuros(cents: number): string {
   const sign = cents < 0 ? "-" : "";

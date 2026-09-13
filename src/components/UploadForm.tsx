@@ -60,6 +60,8 @@ export default function UploadForm({ username }: { username: string }) {
   const [showCamera, setShowCamera] = useState(false);
   const [previewUnlocked, setPreviewUnlocked] = useState(false);
   const [allowDownload, setAllowDownload] = useState(true);
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
+  const [isPremiumSubscribersOnly, setIsPremiumSubscribersOnly] = useState(false);
   const [reuseSoundUrl, setReuseSoundUrl] = useState<string | null>(null);
 
   // Live preview: apply « Son original » to the preview video immediately
@@ -243,6 +245,8 @@ export default function UploadForm({ username }: { username: string }) {
       form.append("video", file);
       form.append("soundName", soundName);
       form.append("allowDownload", allowDownload ? "true" : "false");
+      form.append("isAiGenerated", isAiGenerated ? "true" : "false");
+      form.append("isPremiumSubscribersOnly", isPremiumSubscribersOnly ? "true" : "false");
       if (durationSec != null) form.append("durationSec", String(durationSec));
       form.append("originalVolume", String(originalVolume));
       form.append(
@@ -627,15 +631,48 @@ export default function UploadForm({ username }: { username: string }) {
         </div>
       )}
 
-      <label className="flex items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3 cursor-pointer">
-        <span className="text-sm font-medium">Autoriser le téléchargement</span>
-        <input
-          type="checkbox"
-          checked={allowDownload}
-          onChange={(e) => setAllowDownload(e.target.checked)}
-          className="w-5 h-5 accent-[#fe2c55]"
-        />
-      </label>
+      <div className="rounded-xl bg-white/5 border border-white/10 divide-y divide-white/10">
+        <p className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-white/40">
+          Plus d&apos;options
+        </p>
+        <label className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer">
+          <span className="text-sm font-medium">Autoriser le téléchargement</span>
+          <input
+            type="checkbox"
+            checked={allowDownload}
+            onChange={(e) => setAllowDownload(e.target.checked)}
+            className="w-5 h-5 accent-[#fe2c55]"
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer">
+          <span className="text-sm">
+            <span className="font-medium">Contenu généré par l&apos;IA</span>
+            <span className="block text-[11px] text-white/45">
+              Transparence (comme TikTok / YouTube)
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={isAiGenerated}
+            onChange={(e) => setIsAiGenerated(e.target.checked)}
+            className="w-5 h-5 accent-[#fe2c55]"
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer">
+          <span className="text-sm">
+            <span className="font-medium">Réservé aux abonnés Premium</span>
+            <span className="block text-[11px] text-white/45">
+              ≠ badge certifié ≠ AfriVoix Pro — abonnement fan→créateur
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={isPremiumSubscribersOnly}
+            onChange={(e) => setIsPremiumSubscribersOnly(e.target.checked)}
+            className="w-5 h-5 accent-[#fe2c55]"
+          />
+        </label>
+      </div>
 
       {error && <p className="text-[#fe2c55] text-sm">{error}</p>}
 

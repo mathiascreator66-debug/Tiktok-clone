@@ -9,6 +9,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import FollowButton from "./FollowButton";
 import SettingsDrawer from "./SettingsDrawer";
 import TipSheet from "./TipSheet";
+import CreatorPremiumPanel from "./CreatorPremiumPanel";
 import StoryViewer from "./StoryViewer";
 import { formatCount } from "@/lib/format";
 import type { StoryGroup } from "@/lib/types";
@@ -347,14 +348,14 @@ export default function ProfileHeader({
                   onClick={() => setTipOpen(true)}
                   className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
                 >
-                  <Gift size={14} className="text-[#fe2c55]" /> Offrir
+                  <Gift size={14} className="text-[#fe2c55]" /> Pourboire
                 </button>
               ) : (
                 <Link
                   href="/connexion"
                   className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 px-5 py-2 rounded-md text-sm font-semibold"
                 >
-                  <Gift size={14} className="text-[#fe2c55]" /> Offrir
+                  <Gift size={14} className="text-[#fe2c55]" /> Pourboire
                 </Link>
               )}
               {isLoggedIn && (
@@ -463,6 +464,14 @@ export default function ProfileHeader({
             ))}
           </div>
         )}
+
+        <div className="w-full max-w-md mt-4">
+          <CreatorPremiumPanel
+            username={username}
+            isMe={isMe}
+            isLoggedIn={isLoggedIn}
+          />
+        </div>
       </div>
 
       <AvatarLightbox

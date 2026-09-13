@@ -11,6 +11,7 @@ import {
   Ban,
 } from "lucide-react";
 import { formatEuros } from "@/lib/wallet-shared";
+import PaymentMethodPicker from "./PaymentMethodPicker";
 
 type ProState = {
   isPro: boolean;
@@ -27,6 +28,7 @@ export default function ProClient({ username }: { username: string }) {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState("");
   const [okMsg, setOkMsg] = useState("");
+  const [provider, setProvider] = useState("WALLET");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,6 +56,23 @@ export default function ProClient({ username }: { username: string }) {
     setError("");
     setOkMsg("");
     try {
+      if (!useTrial && provider !== "WALLET") {
+        const top = await fetch("/api/payments/demo-checkout", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amountCents: state?.costCents ?? 300,
+            provider,
+            purpose: "pro",
+          }),
+        });
+        const topData = await top.json();
+        if (!top.ok) {
+          setError(topData.error || "Paiement démo échoué");
+          return;
+        }
+      }
       const res = await fetch("/api/pro", {
         method: "POST",
         credentials: "include",
@@ -121,8 +140,9 @@ export default function ProClient({ username }: { username: string }) {
           </p>
         )}
         <p className="mt-3 text-[11px] text-amber-200/80 bg-black/20 rounded-lg px-2 py-1.5">
-          Démo — crédits virtuels. Pas d’abonnement réel ni de Stripe pour
-          l’instant.
+          AfriVoix Pro = abonnement plateforme (badge Pro, analytics). ≠ badge
+          certifié ≠ abonnement Premium créateur (fan→créateur). Démo —
+          crédits virtuels uniquement.
         </p>
       </div>
 
@@ -150,6 +170,9 @@ export default function ProClient({ username }: { username: string }) {
         </p>
       )}
 
+      <div className="mb-3">
+        <PaymentMethodPicker value={provider} onChange={setProvider} />
+      </div>
       <div className="space-y-2">
         <button
           type="button"

@@ -26,6 +26,10 @@ export type FeedVideo = {
   pinned: boolean;
   boostedUntil: string | null;
   allowDownload: boolean;
+  isAiGenerated: boolean;
+  isPremiumSubscribersOnly: boolean;
+  /** Viewer a un abonnement Premium actif chez ce créateur */
+  isCreatorSubscriber?: boolean;
   hashtags?: string[];
   user: {
     id: string;
@@ -52,6 +56,8 @@ export type CommentUser = {
   avatarUrl: string | null;
   isVerified?: boolean;
   isPro?: boolean;
+  /** Abonné Premium de l'auteur de la vidéo commentée */
+  isCreatorSubscriber?: boolean;
 };
 
 export type CommentItem = {
@@ -70,6 +76,7 @@ export type StoryItem = {
   id: string;
   mediaUrl: string;
   caption: string | null;
+  isAiGenerated?: boolean;
   soundName: string | null;
   soundUrl: string | null;
   originalVolume: number;

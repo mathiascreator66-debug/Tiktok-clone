@@ -645,6 +645,38 @@ async function main() {
     },
   });
 
+
+  // --- Config paiements par pays (démo) ---
+  const { DEFAULT_COUNTRY_PROVIDERS, SEED_PAYMENT_COUNTRIES } = await import(
+    "../src/lib/payments"
+  );
+  console.log("Configuration des moyens de paiement par pays...");
+  for (const countryCode of SEED_PAYMENT_COUNTRIES) {
+    const list = DEFAULT_COUNTRY_PROVIDERS[countryCode] || [];
+    for (const item of list) {
+      await prisma.paymentMethodConfig.upsert({
+        where: {
+          countryCode_provider: {
+            countryCode,
+            provider: item.provider,
+          },
+        },
+        create: {
+          countryCode,
+          provider: item.provider,
+          currency: item.currency,
+          enabled: true,
+          metadata: JSON.stringify({ seeded: true, demo: true }),
+        },
+        update: {
+          currency: item.currency,
+          enabled: true,
+        },
+      });
+    }
+  }
+  console.log("  configs paiement seedées (BJ, CI, SN, NG + PayPal/Crypto global)");
+
   console.log("\nSeed terminé !");
   console.log("Comptes démo (mot de passe: demo1234):");
   console.log("  - demo@afrivoix.local / demo");

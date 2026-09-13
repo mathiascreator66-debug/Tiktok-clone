@@ -19,7 +19,7 @@ import CommentPanel from "./CommentPanel";
 import Toast from "./Toast";
 import VideoOwnerMenu from "./VideoOwnerMenu";
 import ShareSheet from "./ShareSheet";
-import TipSheet from "./TipSheet";
+import GiftSheet from "./GiftSheet";
 import type { FeedVideo } from "@/lib/types";
 import { soundLabel } from "@/lib/sounds";
 import { formatCount } from "@/lib/format";
@@ -67,8 +67,10 @@ export default function VideoCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
-  const [tipOpen, setTipOpen] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
   const [boostedUntil, setBoostedUntil] = useState(video.boostedUntil);
+  const [aiGenerated, setAiGenerated] = useState(Boolean(video.isAiGenerated));
+  const [premiumOnly, setPremiumOnly] = useState(Boolean(video.isPremiumSubscribersOnly));
   const [muted, setMuted] = useState(false);
   const [paused, setPaused] = useState(false);
   /** Browser blocked unmuted autoplay — show « Activer le son » until gesture. */
@@ -105,7 +107,7 @@ export default function VideoCard({
     el.playbackRate = playbackRate;
     applyMediaGain(el, video.originalVolume ?? 1);
 
-    if (isActive && !commentsOpen && !shareOpen && !tipOpen && !paused) {
+    if (isActive && !commentsOpen && !shareOpen && !giftOpen && !paused) {
       const start = videoTrimStartSec;
       if (el.currentTime < start || (videoTrimEndSec != null && el.currentTime >= videoTrimEndSec)) {
         el.currentTime = start;
@@ -140,7 +142,7 @@ export default function VideoCard({
     isActive,
     commentsOpen,
     shareOpen,
-    tipOpen,
+    giftOpen,
     playbackRate,
     paused,
     muted,
@@ -171,7 +173,7 @@ export default function VideoCard({
       isActive &&
       !commentsOpen &&
       !shareOpen &&
-      !tipOpen &&
+      !giftOpen &&
       !paused &&
       canHear
     ) {
@@ -194,7 +196,7 @@ export default function VideoCard({
     isActive,
     commentsOpen,
     shareOpen,
-    tipOpen,
+    giftOpen,
     paused,
     muted,
     needsSoundGesture,
@@ -710,15 +712,15 @@ export default function VideoCard({
                 window.location.href = "/connexion";
                 return;
               }
-              setTipOpen(true);
+              setGiftOpen(true);
             }}
             className="flex flex-col items-center gap-1 group"
-            aria-label="Offrir"
+            aria-label="Cadeau"
           >
             <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur flex items-center justify-center group-active:scale-90 transition">
               <Gift size={26} className="text-[#fe2c55]" />
             </div>
-            <span className="text-xs font-semibold">Offrir</span>
+            <span className="text-xs font-semibold">Cadeau</span>
           </button>
         )}
 
@@ -743,8 +745,12 @@ export default function VideoCard({
             caption={caption}
             pinned={video.pinned}
             boostedUntil={boostedUntil}
+            isAiGenerated={aiGenerated}
+            isPremiumSubscribersOnly={premiumOnly}
             onCaptionUpdated={setCaption}
             onBoosted={setBoostedUntil}
+            onAiGenerated={setAiGenerated}
+            onPremiumOnly={setPremiumOnly}
             onDeleted={() => {
               setHidden(true);
               onDeleted?.();
@@ -919,13 +925,47 @@ export default function VideoCard({
         onDone={(msg) => setToast(msg)}
       />
 
-      <TipSheet
-        open={tipOpen}
-        onClose={() => setTipOpen(false)}
+
+      {(aiGenerated || (premiumOnly && !video.isCreatorSubscriber && !video.isOwner)) && (
+        <div className="absolute top-14 left-3 z-20 flex flex-col gap-1.5 pointer-events-none">
+          {aiGenerated && (
+            <span className="inline-flex items-center rounded-md bg-black/65 border border-white/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/90">
+              Contenu IA
+            </span>
+          )}
+          {premiumOnly && !video.isCreatorSubscriber && !video.isOwner && (
+            <span className="inline-flex items-center rounded-md bg-amber-500/90 px-2 py-0.5 text-[10px] font-semibold text-black">
+              Premium abonnés
+            </span>
+          )}
+        </div>
+      )}
+
+      {premiumOnly && !video.isCreatorSubscriber && !video.isOwner && (
+        <div className="absolute inset-0 z-[25] flex flex-col items-center justify-center bg-black/70 backdrop-blur-md px-6 text-center">
+          <p className="font-bold text-lg mb-1">Contenu Premium</p>
+          <p className="text-sm text-white/70 mb-3">
+            Réservé aux abonnés Premium de @{video.user.username}
+            <span className="block text-[11px] text-white/45 mt-1">
+              ≠ badge certifié ≠ AfriVoix Pro
+            </span>
+          </p>
+          <a
+            href={`/profil/${video.user.username}`}
+            className="bg-[#fe2c55] px-4 py-2 rounded-full text-sm font-semibold"
+          >
+            Voir l&apos;abonnement
+          </a>
+        </div>
+      )}
+
+      <GiftSheet
+        open={giftOpen}
+        onClose={() => setGiftOpen(false)}
         toUsername={video.user.username}
         videoId={video.id}
         isLoggedIn={isLoggedIn}
-        onTipped={() => setToast("Pourboire envoyé (démo)")}
+        onGifted={(g) => setToast(`${g.emoji} ${g.label} envoyé (démo)`)}
       />
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

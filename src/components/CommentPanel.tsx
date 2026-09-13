@@ -387,6 +387,11 @@ export default function CommentPanel({
                   >
                     @{c.user.username}
                     {(c.user.isVerified || c.user.isPro) && <VerifiedBadge size={13} />}
+                    {c.user.isCreatorSubscriber && (
+                      <span className="ml-1 inline-flex items-center rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                        Abonné
+                      </span>
+                    )}
                   </Link>
                   <span className="text-[10px] text-white/35">
                     {formatRelativeFr(c.createdAt)}

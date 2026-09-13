@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
     const ct = req.headers.get("content-type") || "";
     let content = "";
     let visibility = "PUBLIC";
+    let isAiGenerated = false;
     const imageUrls: string[] = [];
 
     if (ct.includes("multipart/form-data")) {
@@ -95,6 +96,8 @@ export async function POST(req: NextRequest) {
       content = String(form.get("content") || "").trim();
       visibility = String(form.get("visibility") || "PUBLIC").toUpperCase();
       if (visibility !== "FOLLOWERS") visibility = "PUBLIC";
+      const aiRaw = String(form.get("isAiGenerated") ?? "false").toLowerCase();
+      isAiGenerated = ["1", "true", "yes", "on"].includes(aiRaw);
       const files = form.getAll("images") as File[];
       for (const file of files.slice(0, 6)) {
         if (!file || !file.size) continue;
@@ -112,6 +115,7 @@ export async function POST(req: NextRequest) {
         String(body.visibility || "PUBLIC").toUpperCase() === "FOLLOWERS"
           ? "FOLLOWERS"
           : "PUBLIC";
+      isAiGenerated = Boolean(body.isAiGenerated);
     }
 
     if (!content && imageUrls.length === 0) {
@@ -125,6 +129,7 @@ export async function POST(req: NextRequest) {
       data: {
         authorId: session.id,
         content: content || "",
+        isAiGenerated,
         visibility,
         images: {
           create: imageUrls.map((imageUrl, i) => ({

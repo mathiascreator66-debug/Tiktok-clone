@@ -22,6 +22,8 @@ type VideoWithRelations = {
   pinnedAt: Date | null;
   boostedUntil: Date | null;
   allowDownload?: boolean;
+  isAiGenerated?: boolean;
+  isPremiumSubscribersOnly?: boolean;
   createdAt: Date;
   userId: string;
   user: {
@@ -72,6 +74,9 @@ function mapVideo(
     pinned: Boolean(v.pinnedAt),
     boostedUntil: v.boostedUntil ? v.boostedUntil.toISOString() : null,
     allowDownload: v.allowDownload !== false,
+    isAiGenerated: Boolean(v.isAiGenerated),
+    isPremiumSubscribersOnly: Boolean(v.isPremiumSubscribersOnly),
+    isCreatorSubscriber: Boolean((v as { isCreatorSubscriber?: boolean }).isCreatorSubscriber),
     hashtags: v.hashtags?.map((h) => h.hashtag.name) ?? [],
     user: {
       id: v.user.id,
@@ -112,6 +117,29 @@ const videoInclude = (session: SessionUser | null) => ({
     : (false as const),
   _count: { select: { likes: true, comments: true, reposts: true, bookmarks: true } },
 });
+
+
+async function attachCreatorSubFlags(
+  session: SessionUser | null,
+  videos: FeedVideo[]
+): Promise<FeedVideo[]> {
+  if (!session || videos.length === 0) return videos;
+  const creatorIds = Array.from(new Set(videos.map((v) => v.user.id)));
+  const subs = await prisma.creatorSubscriber.findMany({
+    where: {
+      fanId: session.id,
+      creatorId: { in: creatorIds },
+      status: "ACTIVE",
+      until: { gt: new Date() },
+    },
+    select: { creatorId: true },
+  });
+  const set = new Set(subs.map((s) => s.creatorId));
+  return videos.map((v) => ({
+    ...v,
+    isCreatorSubscriber: v.isOwner || set.has(v.user.id),
+  }));
+}
 
 async function hiddenVideoIds(session: SessionUser | null): Promise<string[]> {
   if (!session) return [];
@@ -311,7 +339,10 @@ async function buildMixedFeed(
       return b.sortAt - a.sortAt;
     });
   }
-  return items.map((i) => i.item);
+  return attachCreatorSubFlags(
+    session,
+    items.map((i) => i.item)
+  );
 }
 
 /** Fil « Pour toi » : classement par score d'engagement (voir engagementScore). */

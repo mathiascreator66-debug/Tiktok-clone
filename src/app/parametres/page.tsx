@@ -15,7 +15,7 @@ import {
   Info,
   HelpCircle,
   FileText,
-  BarChart3, UserX } from "lucide-react";
+  BarChart3, UserX, CreditCard } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import DataSaverToggle from "@/components/DataSaverToggle";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -80,6 +80,11 @@ export default async function ParametresPage() {
           href="/solde"
           icon={<Wallet size={20} />}
           label="Solde"
+        />
+        <LinkItem
+          href="/parametres/paiements"
+          icon={<CreditCard size={20} />}
+          label="Moyens de paiement"
         />
         <LinkItem
           href="/pro"
