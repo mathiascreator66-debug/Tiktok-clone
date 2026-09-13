@@ -68,6 +68,16 @@ model Video {
   soundName     String?
   /// Gallery-uploaded audio URL; when set, playback mutes original video audio
   soundUrl      String?
+  /// Gain for gallery audio (0–2). Default 1 = 100%
+  soundVolume   Float           @default(1)
+  /// Trim start of gallery audio in ms
+  soundTrimStartMs Int          @default(0)
+  /// Trim end of gallery audio in ms; null = full file
+  soundTrimEndMs Int?
+  /// JSON array of text overlays: {id,text,fontFamily,fontSize,color,bgColor?,align,xPct,yPct,startMs,endMs?,bold,italic,stroke?}
+  textOverlays  String?
+  /// JSON array of caption cues: {startMs,endMs,text}
+  captions      String?
   durationSec   Float?
   pinnedAt      DateTime?
   /// Boost actif jusqu'à cette date (visibilité feed Pour toi)
@@ -205,6 +215,9 @@ model Story {
   soundName   String?
   /// Gallery-uploaded audio; when set, mute original video audio on playback
   soundUrl    String?
+  soundVolume Float           @default(1)
+  soundTrimStartMs Int        @default(0)
+  soundTrimEndMs Int?
   durationSec Float?
   createdAt   DateTime        @default(now())
   expiresAt   DateTime

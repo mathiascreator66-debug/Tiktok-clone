@@ -23,6 +23,14 @@ import { originalSoundName, soundLabel } from "@/lib/sounds";
 import { syncVideoHashtags } from "@/lib/hashtags";
 import { parseClientDuration, resolveDurationSeconds } from "@/lib/duration";
 import { safeError } from "@/lib/safe-log";
+import {
+  parseGain,
+  parseTrimMs,
+  serializeOverlays,
+  serializeCaptions,
+  parseOverlaysField,
+  parseCaptionsField,
+} from "@/lib/media-edit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -61,6 +69,23 @@ export async function POST(req: NextRequest) {
     const soundRaw = String(form.get("soundName") || "").trim();
     const clientDuration = parseClientDuration(form.get("durationSec"));
     const audioFile = form.get("audio") as File | null;
+    const soundVolume = parseGain(form.get("soundVolume"), 1);
+    const soundTrimStartMs = parseTrimMs(form.get("soundTrimStartMs"), 0) ?? 0;
+    let soundTrimEndMs = parseTrimMs(form.get("soundTrimEndMs"), null);
+    if (
+      soundTrimEndMs != null &&
+      soundTrimEndMs <= soundTrimStartMs
+    ) {
+      soundTrimEndMs = null;
+    }
+    const textOverlaysRaw = String(form.get("textOverlays") || "").trim();
+    const captionsRaw = String(form.get("captions") || "").trim();
+    const textOverlays = textOverlaysRaw
+      ? serializeOverlays(parseOverlaysField(textOverlaysRaw))
+      : null;
+    const captions = captionsRaw
+      ? serializeCaptions(parseCaptionsField(captionsRaw))
+      : null;
 
     if (!caption) {
       return NextResponse.json({ error: "Légende requise." }, { status: 400 });
@@ -152,6 +177,11 @@ export async function POST(req: NextRequest) {
         videoUrl: `/uploads/${filename}`,
         soundName: soundName || originalSoundName(session.username),
         soundUrl,
+        soundVolume: soundUrl ? soundVolume : 1,
+        soundTrimStartMs: soundUrl ? soundTrimStartMs : 0,
+        soundTrimEndMs: soundUrl ? soundTrimEndMs : null,
+        textOverlays,
+        captions,
         userId: session.id,
         durationSec: durationSec ?? null,
       },
@@ -177,6 +207,11 @@ export async function POST(req: NextRequest) {
         videoUrl: video.videoUrl,
         soundName: video.soundName,
         soundUrl: video.soundUrl,
+        soundVolume: video.soundVolume,
+        soundTrimStartMs: video.soundTrimStartMs,
+        soundTrimEndMs: video.soundTrimEndMs,
+        textOverlays: parseOverlaysField(video.textOverlays),
+        captions: parseCaptionsField(video.captions),
         createdAt: video.createdAt.toISOString(),
         likeCount: 0,
         commentCount: 0,

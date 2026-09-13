@@ -47,6 +47,9 @@ export async function GET(
         caption: s.caption,
         soundName: s.soundName,
         soundUrl: s.soundUrl,
+        soundVolume: s.soundVolume ?? 1,
+        soundTrimStartMs: s.soundTrimStartMs ?? 0,
+        soundTrimEndMs: s.soundTrimEndMs ?? null,
         createdAt: s.createdAt.toISOString(),
         expiresAt: s.expiresAt.toISOString(),
         viewedByMe:

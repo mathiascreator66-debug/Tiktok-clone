@@ -5,6 +5,11 @@ export type FeedVideo = {
   soundName: string | null;
   /** Gallery music URL — when set, mute original video audio and play this */
   soundUrl: string | null;
+  soundVolume: number;
+  soundTrimStartMs: number;
+  soundTrimEndMs: number | null;
+  textOverlays: import("./media-edit").TextOverlay[];
+  captions: import("./media-edit").CaptionCue[];
   createdAt: string;
   likeCount: number;
   commentCount: number;
@@ -60,6 +65,9 @@ export type StoryItem = {
   caption: string | null;
   soundName: string | null;
   soundUrl: string | null;
+  soundVolume: number;
+  soundTrimStartMs: number;
+  soundTrimEndMs: number | null;
   createdAt: string;
   expiresAt: string;
   viewedByMe: boolean;

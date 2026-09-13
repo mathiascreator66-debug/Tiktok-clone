@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { SendHorizontal, X } from "lucide-react";
 import Avatar from "./Avatar";
 import type { StoryGroup } from "@/lib/types";
+import { elementVolumeFromGain } from "@/lib/media-edit";
 import { STORY_COMMENT_MAX, STORY_QUICK_EMOJIS } from "@/lib/limits";
 import { LinkifiedText } from "@/lib/linkify";
 import Link from "next/link";
@@ -184,14 +185,24 @@ export default function StoryViewer({
     startTs.current = performance.now();
     pausedRef.current = false;
 
-    // Gallery music: mute original video audio, play attached track
+    // Gallery music: mute original video audio, play attached track (volume + trim)
     const audioEl = audioRef.current;
     if (audioEl) {
       audioEl.pause();
       if (hasGalleryMusic && story.soundUrl) {
         audioEl.src = story.soundUrl;
-        audioEl.currentTime = 0;
+        const trimStart = (story.soundTrimStartMs || 0) / 1000;
+        const trimEnd =
+          story.soundTrimEndMs != null ? story.soundTrimEndMs / 1000 : null;
+        audioEl.volume = elementVolumeFromGain(story.soundVolume ?? 1);
+        audioEl.currentTime = trimStart;
         audioEl.play().catch(() => {});
+        if (trimEnd != null && trimEnd > trimStart) {
+          const stopMs = (trimEnd - trimStart) * 1000;
+          window.setTimeout(() => {
+            if (audioRef.current === audioEl) audioEl.pause();
+          }, stopMs);
+        }
       } else {
         audioEl.removeAttribute("src");
         audioEl.load();
@@ -261,7 +272,10 @@ export default function StoryViewer({
       startTs.current = performance.now() - pauseAtRef.current * IMAGE_MS;
     }
     videoRef.current?.play().catch(() => {});
-    if (story?.soundUrl) audioRef.current?.play().catch(() => {});
+    if (story?.soundUrl && audioRef.current) {
+      audioRef.current.volume = elementVolumeFromGain(story.soundVolume ?? 1);
+      audioRef.current.play().catch(() => {});
+    }
   }
 
   function showFlash(msg: string) {

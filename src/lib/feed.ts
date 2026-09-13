@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import type { SessionUser } from "./auth";
 import type { FeedVideo } from "./types";
+import { parseOverlaysField, parseCaptionsField } from "./media-edit";
 
 type VideoWithRelations = {
   id: string;
@@ -8,6 +9,11 @@ type VideoWithRelations = {
   videoUrl: string;
   soundName: string | null;
   soundUrl: string | null;
+  soundVolume?: number | null;
+  soundTrimStartMs?: number | null;
+  soundTrimEndMs?: number | null;
+  textOverlays?: string | null;
+  captions?: string | null;
   pinnedAt: Date | null;
   boostedUntil: Date | null;
   createdAt: Date;
@@ -39,6 +45,11 @@ function mapVideo(
     videoUrl: v.videoUrl,
     soundName: v.soundName,
     soundUrl: v.soundUrl ?? null,
+    soundVolume: typeof v.soundVolume === "number" ? v.soundVolume : 1,
+    soundTrimStartMs: typeof v.soundTrimStartMs === "number" ? v.soundTrimStartMs : 0,
+    soundTrimEndMs: v.soundTrimEndMs ?? null,
+    textOverlays: parseOverlaysField(v.textOverlays ?? null),
+    captions: parseCaptionsField(v.captions ?? null),
     createdAt: v.createdAt.toISOString(),
     likeCount: v._count.likes,
     commentCount: v._count.comments,

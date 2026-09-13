@@ -19,6 +19,7 @@ import {
 } from "@/lib/limits";
 import { parseClientDuration, resolveDurationSeconds } from "@/lib/duration";
 import { safeError } from "@/lib/safe-log";
+import { parseGain, parseTrimMs } from "@/lib/media-edit";
 
 const MAX_BYTES = MAX_UPLOAD_BYTES;
 const ALLOWED = new Set([
@@ -26,12 +27,13 @@ const ALLOWED = new Set([
   "image/png",
   "image/webp",
   "video/mp4",
+  "video/webm",
 ]);
 
 function isImageOrMp4(mime: string, filename: string) {
   if (ALLOWED.has(mime)) return true;
   const ext = path.extname(filename).toLowerCase();
-  return [".jpg", ".jpeg", ".png", ".webp", ".mp4"].includes(ext);
+  return [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".webm"].includes(ext);
 }
 
 export async function GET() {
@@ -77,6 +79,9 @@ export async function GET() {
           caption: string | null;
           soundName: string | null;
           soundUrl: string | null;
+          soundVolume: number;
+          soundTrimStartMs: number;
+          soundTrimEndMs: number | null;
           createdAt: string;
           expiresAt: string;
           viewedByMe: boolean;
@@ -97,6 +102,9 @@ export async function GET() {
         caption: s.caption,
         soundName: s.soundName,
         soundUrl: s.soundUrl,
+        soundVolume: s.soundVolume ?? 1,
+        soundTrimStartMs: s.soundTrimStartMs ?? 0,
+        soundTrimEndMs: s.soundTrimEndMs ?? null,
         createdAt: s.createdAt.toISOString(),
         expiresAt: s.expiresAt.toISOString(),
         viewedByMe,
@@ -151,6 +159,12 @@ export async function POST(req: NextRequest) {
     const soundRaw = String(form.get("soundName") || "").trim();
     const audioFile = form.get("audio") as File | null;
     const clientDuration = parseClientDuration(form.get("durationSec"));
+    const soundVolume = parseGain(form.get("soundVolume"), 1);
+    const soundTrimStartMs = parseTrimMs(form.get("soundTrimStartMs"), 0) ?? 0;
+    let soundTrimEndMs = parseTrimMs(form.get("soundTrimEndMs"), null);
+    if (soundTrimEndMs != null && soundTrimEndMs <= soundTrimStartMs) {
+      soundTrimEndMs = null;
+    }
 
     if (!file || file.size === 0) {
       return NextResponse.json(
@@ -166,7 +180,7 @@ export async function POST(req: NextRequest) {
     }
     if (!isImageOrMp4(file.type, file.name)) {
       return NextResponse.json(
-        { error: "Formats acceptés : JPEG, PNG, WebP, MP4." },
+        { error: "Formats acceptés : JPEG, PNG, WebP, MP4, WebM." },
         { status: 400 }
       );
     }
@@ -214,7 +228,9 @@ export async function POST(req: NextRequest) {
     await saveUploadFile(file, fullPath);
 
     let durationSec: number | null = null;
-    const isVid = file.type.startsWith("video/") || ext.toLowerCase() === ".mp4";
+    const isVid =
+      file.type.startsWith("video/") ||
+      [".mp4", ".webm"].includes(ext.toLowerCase());
     if (isVid) {
       durationSec = await resolveDurationSeconds(fullPath, clientDuration);
       if (durationSec != null && durationSec > MAX_STORY_DURATION_SEC + 1) {
@@ -253,6 +269,9 @@ export async function POST(req: NextRequest) {
         caption,
         soundName,
         soundUrl,
+        soundVolume: soundUrl ? soundVolume : 1,
+        soundTrimStartMs: soundUrl ? soundTrimStartMs : 0,
+        soundTrimEndMs: soundUrl ? soundTrimEndMs : null,
         durationSec: durationSec ?? null,
         createdAt,
         expiresAt,
@@ -276,6 +295,9 @@ export async function POST(req: NextRequest) {
         caption: story.caption,
         soundName: story.soundName,
         soundUrl: story.soundUrl,
+        soundVolume: story.soundVolume,
+        soundTrimStartMs: story.soundTrimStartMs,
+        soundTrimEndMs: story.soundTrimEndMs,
         createdAt: story.createdAt.toISOString(),
         expiresAt: story.expiresAt.toISOString(),
         viewedByMe: true,

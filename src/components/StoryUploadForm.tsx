@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, ImagePlus, Music2, X } from "lucide-react";
+import { Upload, ImagePlus, Music2, X, Camera, Images } from "lucide-react";
 import {
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_LABEL,
@@ -13,6 +13,8 @@ import {
   formatBytesFr,
 } from "@/lib/limits";
 import { uploadFormData } from "@/lib/upload-client";
+import AudioTrimControls from "./AudioTrimControls";
+import CameraCapture, { type CameraResult } from "./CameraCapture";
 
 export default function StoryUploadForm() {
   const router = useRouter();
@@ -24,23 +26,21 @@ export default function StoryUploadForm() {
   const [isVideo, setIsVideo] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [soundName, setSoundName] = useState("");
+  const [soundVolume, setSoundVolume] = useState(1);
+  const [trimStartSec, setTrimStartSec] = useState(0);
+  const [trimEndSec, setTrimEndSec] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const [durationSec, setDurationSec] = useState<number | null>(null);
+  const [source, setSource] = useState<"gallery" | "camera">("gallery");
+  const [showCamera, setShowCamera] = useState(false);
 
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (f.size > MAX_UPLOAD_BYTES) {
-      setError(`Fichier trop lourd (max ${MAX_UPLOAD_LABEL}).`);
-      return;
-    }
+  function applyCaptured(f: File, url: string) {
     if (preview) URL.revokeObjectURL(preview);
     setFile(f);
     const isVid = f.type.startsWith("video/");
     setIsVideo(isVid);
-    const url = URL.createObjectURL(f);
     setPreview(url);
     setDurationSec(null);
     setError("");
@@ -65,6 +65,22 @@ export default function StoryUploadForm() {
     }
   }
 
+  function onCameraCapture(result: CameraResult) {
+    setShowCamera(false);
+    setSource("camera");
+    applyCaptured(result.file, result.previewUrl);
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > MAX_UPLOAD_BYTES) {
+      setError(`Fichier trop lourd (max ${MAX_UPLOAD_LABEL}).`);
+      return;
+    }
+    applyCaptured(f, URL.createObjectURL(f));
+  }
+
   function onAudioChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -78,12 +94,18 @@ export default function StoryUploadForm() {
     }
     setAudioFile(f);
     setSoundName(f.name.replace(/\.[^.]+$/, "").trim().slice(0, 60));
+    setSoundVolume(1);
+    setTrimStartSec(0);
+    setTrimEndSec(null);
     setError("");
   }
 
   function clearAudio() {
     setAudioFile(null);
     setSoundName("");
+    setSoundVolume(1);
+    setTrimStartSec(0);
+    setTrimEndSec(null);
     if (audioRef.current) audioRef.current.value = "";
   }
 
@@ -108,6 +130,17 @@ export default function StoryUploadForm() {
       if (audioFile) {
         form.append("audio", audioFile);
         if (soundName) form.append("soundName", soundName);
+        form.append("soundVolume", String(soundVolume));
+        form.append(
+          "soundTrimStartMs",
+          String(Math.round(trimStartSec * 1000))
+        );
+        if (trimEndSec != null) {
+          form.append(
+            "soundTrimEndMs",
+            String(Math.round(trimEndSec * 1000))
+          );
+        }
       }
       await uploadFormData("/api/stories", form, setProgress);
       router.push("/");
@@ -121,6 +154,48 @@ export default function StoryUploadForm() {
 
   return (
     <form onSubmit={submit} className="w-full max-w-md mx-auto space-y-5">
+      <div className="flex gap-2 p-1 rounded-full bg-white/5">
+        <button
+          type="button"
+          onClick={() => {
+            setSource("gallery");
+            setShowCamera(false);
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 text-sm font-semibold ${
+            source === "gallery" && !showCamera
+              ? "bg-white text-black"
+              : "text-white/70"
+          }`}
+        >
+          <Images size={14} /> Galerie
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSource("camera");
+            setShowCamera(true);
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 text-sm font-semibold ${
+            showCamera || (source === "camera" && !file)
+              ? "bg-white text-black"
+              : "text-white/70"
+          }`}
+        >
+          <Camera size={14} /> Caméra
+        </button>
+      </div>
+
+      {showCamera ? (
+        <CameraCapture
+          allowModes={["photo", "video"]}
+          maxSeconds={MAX_STORY_DURATION_SEC}
+          onCapture={onCameraCapture}
+          onCancel={() => {
+            setShowCamera(false);
+            setSource("gallery");
+          }}
+        />
+      ) : (
       <div
         onClick={() => fileRef.current?.click()}
         className="relative aspect-[9/16] max-h-[50vh] rounded-2xl border-2 border-dashed border-white/20 bg-white/5 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#25f4ee]/50 transition"
@@ -158,13 +233,14 @@ export default function StoryUploadForm() {
         <input
           ref={fileRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,video/mp4"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
           className="hidden"
           onChange={onFileChange}
         />
       </div>
+      )}
 
-      {file && (
+      {file && !showCamera && (
         <p className="text-xs text-white/45 truncate">
           {file.name} · {formatBytesFr(file.size)}
         </p>
@@ -228,6 +304,19 @@ export default function StoryUploadForm() {
         <p className="text-[11px] text-white/30 mt-1">
           mp3, m4a, aac, wav, ogg — max {MAX_AUDIO_LABEL}
         </p>
+        {audioFile && (
+          <AudioTrimControls
+            audioFile={audioFile}
+            volume={soundVolume}
+            trimStartSec={trimStartSec}
+            trimEndSec={trimEndSec}
+            onVolumeChange={setSoundVolume}
+            onTrimChange={(s, e) => {
+              setTrimStartSec(s);
+              setTrimEndSec(e);
+            }}
+          />
+        )}
       </div>
 
       {error && (

@@ -24,6 +24,8 @@ import { soundLabel } from "@/lib/sounds";
 import { formatCount } from "@/lib/format";
 import type { PlaybackRate } from "@/lib/limits";
 import { LinkifiedText } from "@/lib/linkify";
+import { elementVolumeFromGain } from "@/lib/media-edit";
+import VideoMediaOverlays from "./VideoMediaOverlays";
 
 type Props = {
   video: FeedVideo;
@@ -66,6 +68,8 @@ export default function VideoCard({
   const [hidden, setHidden] = useState(false);
   const [heartBurst, setHeartBurst] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
+  const [currentMs, setCurrentMs] = useState(0);
+  const [showCaptions, setShowCaptions] = useState(true);
   const lastTapRef = useRef(0);
   const muteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const likingRef = useRef(false);
@@ -92,18 +96,42 @@ export default function VideoCard({
     }
   }, [muted, hasInteracted, video.soundUrl]);
 
-  // Play attached gallery audio with the video; pause when inactive
+  // Play attached gallery audio with volume + trim; pause when inactive
   useEffect(() => {
     const audio = audioRef.current;
     const vid = videoRef.current;
     if (!audio || !video.soundUrl) return;
+    const trimStart = (video.soundTrimStartMs || 0) / 1000;
+    const trimEnd =
+      video.soundTrimEndMs != null ? video.soundTrimEndMs / 1000 : null;
+    audio.volume = elementVolumeFromGain(video.soundVolume ?? 1);
+    // Gain > 1: HTMLAudio max is 1; we store up to 2 for future WebAudio boost
     if (isActive && !commentsOpen && !shareOpen && !tipOpen && hasInteracted && !muted) {
-      if (vid) audio.currentTime = vid.currentTime;
+      const offset = vid ? vid.currentTime : 0;
+      const target = trimStart + offset;
+      if (trimEnd != null && target >= trimEnd) {
+        audio.pause();
+        return;
+      }
+      if (Math.abs(audio.currentTime - target) > 0.35) {
+        audio.currentTime = target;
+      }
       audio.play().catch(() => {});
     } else {
       audio.pause();
     }
-  }, [isActive, commentsOpen, shareOpen, tipOpen, hasInteracted, muted, video.soundUrl]);
+  }, [
+    isActive,
+    commentsOpen,
+    shareOpen,
+    tipOpen,
+    hasInteracted,
+    muted,
+    video.soundUrl,
+    video.soundVolume,
+    video.soundTrimStartMs,
+    video.soundTrimEndMs,
+  ]);
 
   useEffect(() => {
     if (!isActive || !isLoggedIn || watchSentRef.current) return;
@@ -344,14 +372,44 @@ export default function VideoCard({
         onTimeUpdate={() => {
           const a = audioRef.current;
           const v = videoRef.current;
-          if (a && v && video.soundUrl && Math.abs(a.currentTime - v.currentTime) > 0.35) {
-            a.currentTime = v.currentTime;
+          if (!v) return;
+          setCurrentMs(Math.round(v.currentTime * 1000));
+          if (!a || !video.soundUrl) return;
+          const trimStart = (video.soundTrimStartMs || 0) / 1000;
+          const trimEnd =
+            video.soundTrimEndMs != null ? video.soundTrimEndMs / 1000 : null;
+          const target = trimStart + v.currentTime;
+          if (trimEnd != null && target >= trimEnd) {
+            a.pause();
+            return;
           }
+          if (Math.abs(a.currentTime - target) > 0.35) {
+            a.currentTime = target;
+          }
+        }}
+        onEnded={() => {
+          audioRef.current?.pause();
+        }}
+        onPlay={() => {
+          const a = audioRef.current;
+          if (!a || !video.soundUrl || muted || !hasInteracted) return;
+          a.volume = elementVolumeFromGain(video.soundVolume ?? 1);
+          a.play().catch(() => {});
+        }}
+        onPause={() => {
+          audioRef.current?.pause();
         }}
       />
       {video.soundUrl ? (
-        <audio ref={audioRef} src={video.soundUrl} loop preload="auto" />
+        <audio ref={audioRef} src={video.soundUrl} preload="auto" />
       ) : null}
+
+      <VideoMediaOverlays
+        overlays={video.textOverlays || []}
+        captions={video.captions || []}
+        currentMs={currentMs}
+        showCaptions={showCaptions}
+      />
 
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-black/20" />
 
@@ -559,6 +617,20 @@ export default function VideoCard({
       >
         {muted || !hasInteracted ? <VolumeX size={18} /> : <Volume2 size={18} />}
       </button>
+      {(video.captions?.length ?? 0) > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowCaptions((s) => !s);
+          }}
+          className="absolute top-16 right-3 z-20 w-9 h-9 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-[10px] font-bold"
+          aria-label={showCaptions ? "Masquer les sous-titres" : "Afficher les sous-titres"}
+        >
+          {showCaptions ? "CC" : "cc"}
+        </button>
+      )}
+
 
       <CommentPanel
         videoId={video.id}

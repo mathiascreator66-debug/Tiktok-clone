@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Film, Images, Music2, X } from "lucide-react";
+import { Upload, Film, Images, Music2, X, Camera } from "lucide-react";
 import {
   CAPTION_MAX_LENGTH,
   MAX_UPLOAD_BYTES,
@@ -15,7 +15,17 @@ import {
 } from "@/lib/limits";
 import { originalSoundName } from "@/lib/sounds";
 import { uploadFormData } from "@/lib/upload-client";
+import {
+  serializeCaptions,
+  serializeOverlays,
+  type CaptionCue,
+  type TextOverlay,
+} from "@/lib/media-edit";
 import SoundPicker from "./SoundPicker";
+import AudioTrimControls from "./AudioTrimControls";
+import TextOverlayEditor from "./TextOverlayEditor";
+import CaptionEditor from "./CaptionEditor";
+import CameraCapture, { type CameraResult } from "./CameraCapture";
 
 export default function UploadForm({ username }: { username: string }) {
   const router = useRouter();
@@ -26,10 +36,58 @@ export default function UploadForm({ username }: { username: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [soundName, setSoundName] = useState(originalSoundName(username));
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [soundVolume, setSoundVolume] = useState(1);
+  const [trimStartSec, setTrimStartSec] = useState(0);
+  const [trimEndSec, setTrimEndSec] = useState<number | null>(null);
+  const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
+  const [captionCues, setCaptionCues] = useState<CaptionCue[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const [durationSec, setDurationSec] = useState<number | null>(null);
+  const [source, setSource] = useState<"gallery" | "camera">("gallery");
+  const [showCamera, setShowCamera] = useState(false);
+
+  function applyMediaFile(f: File, url: string) {
+    if (preview) URL.revokeObjectURL(preview);
+    setFile(f);
+    setPreview(url);
+    setDurationSec(null);
+    setError("");
+    if (f.type.startsWith("video/")) {
+      const vid = document.createElement("video");
+      vid.preload = "metadata";
+      vid.onloadedmetadata = () => {
+        const d = vid.duration;
+        if (Number.isFinite(d)) {
+          setDurationSec(d);
+          if (d > MAX_VIDEO_DURATION_SEC + 1) {
+            setError(
+              `Vidéo trop longue (max ${MAX_VIDEO_DURATION_SEC / 60} min).`
+            );
+            setFile(null);
+            setPreview(null);
+            URL.revokeObjectURL(url);
+          }
+        }
+      };
+      vid.src = url;
+    }
+  }
+
+  function onCameraCapture(result: CameraResult) {
+    setShowCamera(false);
+    setSource("camera");
+    if (result.kind === "image") {
+      URL.revokeObjectURL(result.previewUrl);
+      setError(
+        "Les photos se publient en Story. Ouvrez l’onglet Story pour une photo, ou filmez une vidéo ici."
+      );
+      setFile(null);
+      return;
+    }
+    applyMediaFile(result.file, result.previewUrl);
+  }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -38,30 +96,11 @@ export default function UploadForm({ username }: { username: string }) {
       setError(`Vidéo trop lourde (max ${MAX_UPLOAD_LABEL}).`);
       return;
     }
-    if (preview) URL.revokeObjectURL(preview);
-    setFile(f);
-    const url = URL.createObjectURL(f);
-    setPreview(url);
-    setDurationSec(null);
-    setError("");
-    // Probe duration without revoking the preview object URL
-    const vid = document.createElement("video");
-    vid.preload = "metadata";
-    vid.onloadedmetadata = () => {
-      const d = vid.duration;
-      if (Number.isFinite(d)) {
-        setDurationSec(d);
-        if (d > MAX_VIDEO_DURATION_SEC + 1) {
-          setError(
-            `Vidéo trop longue (max ${MAX_VIDEO_DURATION_SEC / 60} min).`
-          );
-          setFile(null);
-          setPreview(null);
-          URL.revokeObjectURL(url);
-        }
-      }
-    };
-    vid.src = url;
+    if (!f.type.startsWith("video/")) {
+      setError("Pour Publier, choisissez une vidéo (ou utilisez Story pour une photo).");
+      return;
+    }
+    applyMediaFile(f, URL.createObjectURL(f));
   }
 
   function onAudioChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -78,6 +117,9 @@ export default function UploadForm({ username }: { username: string }) {
     setAudioFile(f);
     const base = f.name.replace(/\.[^.]+$/, "").trim().slice(0, 60);
     if (base) setSoundName(base);
+    setSoundVolume(1);
+    setTrimStartSec(0);
+    setTrimEndSec(null);
     setError("");
   }
 
@@ -85,6 +127,9 @@ export default function UploadForm({ username }: { username: string }) {
     setAudioFile(null);
     if (audioRef.current) audioRef.current.value = "";
     setSoundName(originalSoundName(username));
+    setSoundVolume(1);
+    setTrimStartSec(0);
+    setTrimEndSec(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -110,9 +155,25 @@ export default function UploadForm({ username }: { username: string }) {
       form.append("video", file);
       form.append("soundName", soundName);
       if (durationSec != null) form.append("durationSec", String(durationSec));
-      if (audioFile) form.append("audio", audioFile);
+      if (audioFile) {
+        form.append("audio", audioFile);
+        form.append("soundVolume", String(soundVolume));
+        form.append(
+          "soundTrimStartMs",
+          String(Math.round(trimStartSec * 1000))
+        );
+        if (trimEndSec != null) {
+          form.append(
+            "soundTrimEndMs",
+            String(Math.round(trimEndSec * 1000))
+          );
+        }
+      }
+      const overlaysJson = serializeOverlays(textOverlays);
+      if (overlaysJson) form.append("textOverlays", overlaysJson);
+      const captionsJson = serializeCaptions(captionCues);
+      if (captionsJson) form.append("captions", captionsJson);
       await uploadFormData("/api/videos", form, setProgress);
-      // Fast exit after success — don't wait on heavy refresh
       router.push("/");
       router.refresh();
     } catch (err) {
@@ -124,6 +185,48 @@ export default function UploadForm({ username }: { username: string }) {
 
   return (
     <form onSubmit={submit} className="w-full max-w-md mx-auto space-y-5">
+      <div className="flex gap-2 p-1 rounded-full bg-white/5">
+        <button
+          type="button"
+          onClick={() => {
+            setSource("gallery");
+            setShowCamera(false);
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 text-sm font-semibold ${
+            source === "gallery" && !showCamera
+              ? "bg-white text-black"
+              : "text-white/70"
+          }`}
+        >
+          <Images size={14} /> Galerie
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSource("camera");
+            setShowCamera(true);
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 text-sm font-semibold ${
+            showCamera || (source === "camera" && !file)
+              ? "bg-white text-black"
+              : "text-white/70"
+          }`}
+        >
+          <Camera size={14} /> Caméra
+        </button>
+      </div>
+
+      {showCamera ? (
+        <CameraCapture
+          allowModes={["photo", "video"]}
+          maxSeconds={MAX_VIDEO_DURATION_SEC}
+          onCapture={onCameraCapture}
+          onCancel={() => {
+            setShowCamera(false);
+            setSource("gallery");
+          }}
+        />
+      ) : (
       <div
         onClick={() => fileRef.current?.click()}
         className="relative aspect-[9/16] max-h-[46vh] rounded-2xl border-2 border-dashed border-white/20 bg-white/5 flex flex-col items-center justify-center cursor-pointer overflow-hidden hover:border-[#fe2c55]/50 transition"
@@ -160,8 +263,9 @@ export default function UploadForm({ username }: { username: string }) {
           onChange={onFileChange}
         />
       </div>
+      )}
 
-      {file && (
+      {file && !showCamera && (
         <p className="text-xs text-white/45 flex items-center gap-2">
           <Film size={12} />
           <span className="truncate">{file.name}</span>
@@ -191,55 +295,92 @@ export default function UploadForm({ username }: { username: string }) {
         </p>
       </div>
 
-      <div>
-        <label className="block text-sm text-white/60 mb-1.5">
-          Musique depuis la galerie
-        </label>
-        <div className="flex gap-2 items-center">
-          <button
-            type="button"
-            onClick={() => audioRef.current?.click()}
-            className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 rounded-xl py-2.5 text-sm"
-          >
-            <Music2 size={16} />
-            {audioFile ? "Changer l'audio" : "Choisir un fichier audio"}
-          </button>
-          {audioFile && (
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium text-white/80">Son</h3>
+        <div>
+          <label className="block text-sm text-white/60 mb-1.5">
+            Musique depuis la galerie
+          </label>
+          <div className="flex gap-2 items-center">
             <button
               type="button"
-              onClick={clearAudio}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/15"
-              aria-label="Retirer l'audio"
+              onClick={() => audioRef.current?.click()}
+              className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 rounded-xl py-2.5 text-sm"
             >
-              <X size={16} />
+              <Music2 size={16} />
+              {audioFile ? "Changer l'audio" : "Choisir un fichier audio"}
             </button>
+            {audioFile && (
+              <button
+                type="button"
+                onClick={clearAudio}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/15"
+                aria-label="Retirer l'audio"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <input
+            ref={audioRef}
+            type="file"
+            accept={AUDIO_ACCEPT}
+            className="hidden"
+            onChange={onAudioChange}
+          />
+          {audioFile && (
+            <p className="text-xs text-white/45 mt-1.5 truncate">
+              {audioFile.name} · {formatBytesFr(audioFile.size)} — la vidéo sera
+              muette, l&apos;audio de galerie jouera
+            </p>
           )}
-        </div>
-        <input
-          ref={audioRef}
-          type="file"
-          accept={AUDIO_ACCEPT}
-          className="hidden"
-          onChange={onAudioChange}
-        />
-        {audioFile && (
-          <p className="text-xs text-white/45 mt-1.5 truncate">
-            {audioFile.name} · {formatBytesFr(audioFile.size)} — la vidéo sera
-            muette, l&apos;audio de galerie jouera
+          <p className="text-[11px] text-white/30 mt-1">
+            mp3, m4a, aac, wav, ogg — max {MAX_AUDIO_LABEL}
           </p>
-        )}
-        <p className="text-[11px] text-white/30 mt-1">
-          mp3, m4a, aac, wav, ogg — max {MAX_AUDIO_LABEL}
-        </p>
-      </div>
+        </div>
 
-      {!audioFile && (
-        <SoundPicker
-          value={soundName}
-          username={username}
-          onChange={setSoundName}
+        {audioFile && (
+          <AudioTrimControls
+            audioFile={audioFile}
+            volume={soundVolume}
+            trimStartSec={trimStartSec}
+            trimEndSec={trimEndSec}
+            onVolumeChange={setSoundVolume}
+            onTrimChange={(s, e) => {
+              setTrimStartSec(s);
+              setTrimEndSec(e);
+            }}
+          />
+        )}
+
+        {!audioFile && (
+          <SoundPicker
+            value={soundName}
+            username={username}
+            onChange={setSoundName}
+          />
+        )}
+      </section>
+
+      <section>
+        <h3 className="text-sm font-medium text-white/80 mb-2">Texte</h3>
+        <TextOverlayEditor
+          overlays={textOverlays}
+          onChange={setTextOverlays}
+          previewUrl={preview}
         />
-      )}
+      </section>
+
+      <section>
+        <h3 className="text-sm font-medium text-white/80 mb-2">
+          Sous-titres / Transcription
+        </h3>
+        <CaptionEditor
+          cues={captionCues}
+          onChange={setCaptionCues}
+          videoUrl={preview}
+        />
+      </section>
 
       {error && <p className="text-[#fe2c55] text-sm">{error}</p>}
 

@@ -3,6 +3,15 @@ import { unlink } from "fs/promises";
 import { resolveUploadPath } from "@/lib/uploads";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import {
+  parseGain,
+  parseTrimMs,
+  serializeOverlays,
+  serializeCaptions,
+  parseOverlaysField,
+  parseCaptionsField,
+} from "@/lib/media-edit";
+import { syncVideoHashtags } from "@/lib/hashtags";
 
 export async function PATCH(
   req: NextRequest,
@@ -34,9 +43,44 @@ export async function PATCH(
       );
     }
 
+    const data: {
+      caption: string;
+      soundVolume?: number;
+      soundTrimStartMs?: number;
+      soundTrimEndMs?: number | null;
+      textOverlays?: string | null;
+      captions?: string | null;
+    } = { caption };
+
+    if (body.soundVolume != null) {
+      data.soundVolume = parseGain(body.soundVolume, 1);
+    }
+    if (body.soundTrimStartMs != null) {
+      data.soundTrimStartMs = parseTrimMs(body.soundTrimStartMs, 0) ?? 0;
+    }
+    if ("soundTrimEndMs" in body) {
+      data.soundTrimEndMs = parseTrimMs(body.soundTrimEndMs, null);
+    }
+    if ("textOverlays" in body) {
+      data.textOverlays =
+        body.textOverlays == null
+          ? null
+          : typeof body.textOverlays === "string"
+            ? serializeOverlays(parseOverlaysField(body.textOverlays))
+            : serializeOverlays(body.textOverlays);
+    }
+    if ("captions" in body) {
+      data.captions =
+        body.captions == null
+          ? null
+          : typeof body.captions === "string"
+            ? serializeCaptions(parseCaptionsField(body.captions))
+            : serializeCaptions(body.captions);
+    }
+
     const updated = await prisma.video.update({
       where: { id: params.id },
-      data: { caption },
+      data,
       include: {
         user: {
           select: {
@@ -49,6 +93,8 @@ export async function PATCH(
         _count: { select: { likes: true, comments: true, reposts: true } },
       },
     });
+
+    await syncVideoHashtags(updated.id, caption).catch(() => {});
 
     return NextResponse.json({
       video: {
